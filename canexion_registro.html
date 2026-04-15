@@ -1,0 +1,398 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Únete a Familia Canexion</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+:root{--gd:#1a3a1f;--gm:#2d6a35;--gs:#4a9455;--gp:#c8e6cb;--gg:#f0f7f1;--am:#e8a020;--ap:#fef3dc;--tp:#1a2a1c;--ts:#4a6050;--tm:#8aaa90;--bd:#d4e8d8;--sf:#ffffff;--bg:#f5f8f5;--r:12px;--rs:8px;}
+*{box-sizing:border-box;margin:0;padding:0;}
+body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--tp);min-height:100vh;}
+
+/* HEADER */
+.header{background:var(--gd);padding:20px 24px;text-align:center;}
+.header-logo{font-family:'DM Mono',monospace;font-size:11px;font-weight:500;color:var(--gp);letter-spacing:.14em;text-transform:uppercase;margin-bottom:4px;}
+.header-title{font-size:20px;font-weight:500;color:white;}
+.header-sub{font-size:13px;color:rgba(255,255,255,.55);margin-top:4px;}
+
+/* CONTENEDOR */
+.container{max-width:480px;margin:0 auto;padding:24px 20px 60px;}
+
+/* FORMULARIO */
+.form-card{background:var(--sf);border:1px solid var(--bd);border-radius:var(--r);padding:24px 20px;}
+.form-section-title{font-family:'DM Mono',monospace;font-size:10px;font-weight:500;color:var(--tm);letter-spacing:.1em;text-transform:uppercase;margin-bottom:14px;margin-top:20px;}
+.form-section-title:first-child{margin-top:0;}
+.fg{margin-bottom:14px;}
+.fl{font-size:12px;font-weight:500;color:var(--ts);margin-bottom:5px;display:block;}
+.fi{width:100%;background:var(--bg);border:1px solid var(--bd);border-radius:var(--rs);padding:11px 14px;font-family:'DM Sans',sans-serif;font-size:15px;color:var(--tp);outline:none;transition:border-color .15s;-webkit-appearance:none;}
+.fi:focus{border-color:var(--gs);background:white;}
+.fi::placeholder{color:var(--tm);}
+.frow{display:grid;grid-template-columns:1fr 1fr;gap:10px;}
+.fsel{width:100%;background:var(--bg);border:1px solid var(--bd);border-radius:var(--rs);padding:11px 14px;font-family:'DM Sans',sans-serif;font-size:15px;color:var(--tp);outline:none;appearance:none;-webkit-appearance:none;cursor:pointer;}
+.fsel:focus{border-color:var(--gs);}
+.hint{font-size:12px;color:var(--tm);margin-top:4px;}
+
+/* BENEFICIOS PREVIEW */
+.benefits-preview{margin-top:20px;background:var(--gg);border:1px solid var(--bd);border-radius:var(--rs);padding:14px 16px;}
+.bp-title{font-size:12px;font-weight:500;color:var(--gm);margin-bottom:10px;}
+.bp-item{display:flex;align-items:flex-start;gap:8px;margin-bottom:8px;}
+.bp-item:last-child{margin-bottom:0;}
+.bp-dot{width:6px;height:6px;border-radius:50%;background:var(--gs);flex-shrink:0;margin-top:5px;}
+.bp-dot.gold{background:var(--am);}
+.bp-text{font-size:13px;color:var(--ts);}
+.bp-loading{font-size:12px;color:var(--tm);text-align:center;padding:8px 0;}
+
+/* SUBMIT */
+.submit-btn{width:100%;margin-top:20px;background:var(--gm);border:none;border-radius:var(--r);padding:15px;font-family:'DM Sans',sans-serif;font-size:16px;font-weight:500;color:white;cursor:pointer;transition:background .15s;}
+.submit-btn:hover{background:var(--gd);}
+.submit-btn:disabled{opacity:.6;cursor:not-allowed;}
+.terms{font-size:11px;color:var(--tm);text-align:center;margin-top:12px;line-height:1.6;}
+
+/* CONFIRMACIÓN */
+#confirm-screen{display:none;}
+.confirm-hero{background:var(--gd);padding:40px 24px 32px;text-align:center;}
+.confirm-icon{width:64px;height:64px;border-radius:50%;background:rgba(200,230,203,.15);border:2px solid rgba(200,230,203,.3);display:flex;align-items:center;justify-content:center;margin:0 auto 16px;font-size:28px;}
+.confirm-title{font-size:22px;font-weight:500;color:white;margin-bottom:6px;}
+.confirm-sub{font-size:14px;color:rgba(255,255,255,.6);}
+.confirm-name{color:var(--gp);font-weight:500;}
+
+.benefits-card{background:var(--sf);border:1px solid var(--bd);border-radius:var(--r);margin-top:20px;overflow:hidden;}
+.benefits-card-header{background:var(--gg);padding:14px 18px;border-bottom:1px solid var(--bd);}
+.benefits-card-title{font-size:13px;font-weight:500;color:var(--gm);}
+.benefits-card-sub{font-size:12px;color:var(--tm);margin-top:2px;}
+.benefit-row{padding:12px 18px;border-bottom:1px solid var(--bd);display:flex;align-items:flex-start;gap:12px;}
+.benefit-row:last-child{border-bottom:none;}
+.br-dot{width:8px;height:8px;border-radius:50%;flex-shrink:0;margin-top:4px;}
+.br-dot.active{background:var(--gs);}
+.br-dot.always{background:var(--am);}
+.br-body{flex:1;}
+.br-name{font-size:14px;font-weight:500;color:var(--tp);}
+.br-desc{font-size:12px;color:var(--tm);margin-top:2px;}
+.br-badge{font-size:11px;font-weight:500;padding:2px 8px;border-radius:20px;white-space:nowrap;flex-shrink:0;}
+.br-badge.new{background:#e8f4ea;color:var(--gm);}
+.br-badge.always{background:var(--ap);color:#9a6010;}
+
+.whatsapp-box{background:var(--sf);border:1px solid var(--bd);border-radius:var(--r);margin-top:12px;padding:16px 18px;display:flex;align-items:center;gap:12px;}
+.wa-icon{width:40px;height:40px;border-radius:50%;background:#e8f5ea;display:flex;align-items:center;justify-content:center;flex-shrink:0;font-size:20px;}
+.wa-text{flex:1;}
+.wa-title{font-size:13px;font-weight:500;color:var(--tp);}
+.wa-sub{font-size:12px;color:var(--tm);margin-top:2px;}
+
+.back-link{display:block;text-align:center;margin-top:20px;font-size:13px;color:var(--tm);cursor:pointer;text-decoration:underline;}
+
+/* ERRORES */
+.field-error{font-size:12px;color:#8a2020;margin-top:4px;display:none;}
+.fi.error,.fsel.error{border-color:#d09090;}
+</style>
+</head>
+<body>
+
+<div class="header">
+  <div class="header-logo">Familia Canexion</div>
+  <div class="header-title">Únete a nuestra familia</div>
+  <div class="header-sub">Regístrate y empieza a disfrutar de tus beneficios</div>
+</div>
+
+<!-- FORMULARIO -->
+<div id="form-screen">
+  <div class="container">
+    <div class="form-card">
+
+      <div class="form-section-title">Tus datos</div>
+      <div class="fg">
+        <label class="fl">Nombre completo *</label>
+        <input class="fi" id="fn" type="text" placeholder="Ej. Ane Etxeberria" autocomplete="name"/>
+        <div class="field-error" id="err-fn">Por favor introduce tu nombre</div>
+      </div>
+      <div class="fg">
+        <label class="fl">Teléfono (WhatsApp) *</label>
+        <input class="fi" id="fph" type="tel" placeholder="6XX XXX XXX" autocomplete="tel"/>
+        <div class="field-error" id="err-fph">Por favor introduce tu teléfono</div>
+      </div>
+      <div class="fg">
+        <label class="fl">Email (opcional)</label>
+        <input class="fi" id="fe" type="email" placeholder="tu@email.com" autocomplete="email"/>
+      </div>
+
+      <div class="form-section-title">Tu mascota</div>
+      <div class="frow">
+        <div class="fg">
+          <label class="fl">Nombre *</label>
+          <input class="fi" id="fp" type="text" placeholder="Ej. Luna"/>
+          <div class="field-error" id="err-fp">Introduce el nombre</div>
+        </div>
+        <div class="fg">
+          <label class="fl">Especie *</label>
+          <select class="fsel" id="fsp">
+            <option value="">Seleccionar</option>
+            <option value="Perro">Perro</option>
+            <option value="Gato">Gato</option>
+            <option value="Otro">Otro</option>
+          </select>
+          <div class="field-error" id="err-fsp">Selecciona la especie</div>
+        </div>
+      </div>
+      <div class="fg">
+        <label class="fl">Fecha de nacimiento de tu mascota</label>
+        <input class="fi" id="fb" type="date"/>
+        <div class="hint">La usamos para sorprenderte en su cumpleaños 🎂</div>
+      </div>
+      <div class="fg">
+        <label class="fl">¿Qué servicios usas en Canexion? *</label>
+        <select class="fsel" id="fsv" onchange="updateBenefitsPreview()">
+          <option value="">Seleccionar</option>
+          <option value="clinica">Clínica veterinaria</option>
+          <option value="tienda">Tienda / pienso</option>
+          <option value="peluqueria">Peluquería</option>
+          <option value="clinica_tienda">Clínica + tienda</option>
+          <option value="todos">Todos los servicios</option>
+        </select>
+        <div class="field-error" id="err-fsv">Selecciona una opción</div>
+      </div>
+
+      <!-- PREVIEW DE BENEFICIOS (dinámico) -->
+      <div class="benefits-preview">
+        <div class="bp-title">Al unirte recibirás:</div>
+        <div id="bp-list">
+          <div class="bp-loading">Cargando beneficios...</div>
+        </div>
+      </div>
+
+      <button class="submit-btn" id="sbtn" onclick="submitForm()">Unirme a Familia Canexion</button>
+      <div class="terms">Al registrarte aceptas que Canexion guarde tus datos para gestionar tu programa de fidelización. Puedes solicitar su eliminación en cualquier momento contactando con nosotros.</div>
+    </div>
+  </div>
+</div>
+
+<!-- CONFIRMACIÓN -->
+<div id="confirm-screen">
+  <div class="confirm-hero">
+    <div class="confirm-icon">🐾</div>
+    <div class="confirm-title">¡Bienvenido/a, <span id="conf-name" class="confirm-name"></span>!</div>
+    <div class="confirm-sub">Ya eres parte de Familia Canexion</div>
+  </div>
+  <div class="container">
+    <div class="benefits-card">
+      <div class="benefits-card-header">
+        <div class="benefits-card-title">Tus beneficios activos</div>
+        <div class="benefits-card-sub">Muéstralos en tienda para canjearlos</div>
+      </div>
+      <div id="conf-benefits"></div>
+    </div>
+
+    <div class="whatsapp-box">
+      <div class="wa-icon">💬</div>
+      <div class="wa-text">
+        <div class="wa-title">¿Tienes dudas?</div>
+        <div class="wa-sub">Escríbenos por WhatsApp al 943 04 87 83</div>
+      </div>
+    </div>
+
+    <a class="back-link" href="https://canexion.es">Volver a canexion.es</a>
+  </div>
+</div>
+
+<script>
+// ── CONFIGURACIÓN ─────────────────────────────────────────
+// Mismos valores que en el CRM
+const SUPABASE_URL = "https://lhvaonkibrfujdbbhkkr.supabase.co";
+const SUPABASE_KEY = "sb_publishable_wwY0Zcd-sxz5Gqr_NJ7zhg_5OkSiCU0";
+
+let benefitTemplates = [];
+let discoveryCoupons = [];
+
+// ── INICIALIZACIÓN ────────────────────────────────────────
+window.addEventListener("DOMContentLoaded", loadBenefits);
+
+async function loadBenefits() {
+  try {
+    const headers = { "apikey": SUPABASE_KEY, "Authorization": "Bearer " + SUPABASE_KEY };
+    const [tRes, dRes] = await Promise.all([
+      fetch(SUPABASE_URL + "/rest/v1/benefit_templates?order=order_index", { headers }),
+      fetch(SUPABASE_URL + "/rest/v1/discovery_coupons", { headers })
+    ]);
+    benefitTemplates = (await tRes.json()).filter(t => t.show_in_welcome);
+    discoveryCoupons = await dRes.json();
+    updateBenefitsPreview();
+  } catch(e) {
+    // Si falla la carga, mostrar lista por defecto
+    document.getElementById("bp-list").innerHTML = `
+      <div class="bp-item"><div class="bp-dot"></div><div class="bp-text">Regalo de bienvenida en tienda</div></div>
+      <div class="bp-item"><div class="bp-dot"></div><div class="bp-text">15% de descuento en tu primera compra</div></div>
+      <div class="bp-item"><div class="bp-dot"></div><div class="bp-text">Bono descubrimiento en un servicio nuevo</div></div>
+      <div class="bp-item"><div class="bp-dot gold"></div><div class="bp-text">Acceso a planes de salud exclusivos</div></div>
+      <div class="bp-item"><div class="bp-dot gold"></div><div class="bp-text">Sorteos trimestrales exclusivos</div></div>
+      <div class="bp-item"><div class="bp-dot gold"></div><div class="bp-text">Sorpresa en el cumpleaños de tu mascota</div></div>`;
+  }
+}
+
+// Actualiza la preview cuando cambia el servicio
+function updateBenefitsPreview() {
+  const svc = document.getElementById("fsv").value;
+  const list = [...benefitTemplates].sort((a, b) => a.order_index - b.order_index);
+
+  // Insertar cupón de descubrimiento si aplica
+  const coupon = discoveryCoupons.find(c => c.svc === svc);
+  const preview = list.map(t => ({ name: t.name, dotType: t.dot_type }));
+  if (svc && coupon && coupon.active && coupon.name) {
+    preview.splice(2, 0, { name: coupon.name, dotType: "active" });
+  }
+
+  if (!preview.length) {
+    document.getElementById("bp-list").innerHTML = '<div class="bp-loading">Selecciona un servicio para ver tus beneficios</div>';
+    return;
+  }
+
+  document.getElementById("bp-list").innerHTML = preview.map(b => `
+    <div class="bp-item">
+      <div class="bp-dot ${b.dotType === 'always' ? 'gold' : ''}"></div>
+      <div class="bp-text">${b.name}</div>
+    </div>
+  `).join("");
+}
+
+// ── VALIDACIÓN ────────────────────────────────────────────
+function validate() {
+  let ok = true;
+  const fields = [
+    { id:"fn",  err:"err-fn"  },
+    { id:"fph", err:"err-fph" },
+    { id:"fp",  err:"err-fp"  },
+    { id:"fsp", err:"err-fsp" },
+    { id:"fsv", err:"err-fsv" },
+  ];
+  fields.forEach(f => {
+    const el  = document.getElementById(f.id);
+    const err = document.getElementById(f.err);
+    if (!el.value.trim()) {
+      el.classList.add("error");
+      err.style.display = "block";
+      ok = false;
+    } else {
+      el.classList.remove("error");
+      err.style.display = "none";
+    }
+  });
+  return ok;
+}
+
+// ── ENVÍO ─────────────────────────────────────────────────
+async function submitForm() {
+  if (!validate()) return;
+  const btn = document.getElementById("sbtn");
+  btn.disabled = true;
+  btn.textContent = "Registrando...";
+
+  const name    = document.getElementById("fn").value.trim();
+  const phone   = document.getElementById("fph").value.trim().replace(/\s/g, "");
+  const email   = document.getElementById("fe").value.trim();
+  const pet     = document.getElementById("fp").value.trim();
+  const species = document.getElementById("fsp").value;
+  const petBday = document.getElementById("fb").value;
+  const svc     = document.getElementById("fsv").value;
+
+  const headers = {
+    "apikey":        SUPABASE_KEY,
+    "Authorization": "Bearer " + SUPABASE_KEY,
+    "Content-Type":  "application/json"
+  };
+
+  try {
+    // Comprobar duplicado por teléfono
+    const dupRes = await fetch(SUPABASE_URL + "/rest/v1/clients?phone=eq." + encodeURIComponent(phone), { headers });
+    const dupData = await dupRes.json();
+    if (dupData && dupData.length > 0) {
+      btn.disabled = false;
+      btn.textContent = "Unirme a Familia Canexion";
+      alert("Este teléfono ya está registrado en Familia Canexion.\n\nSi tienes dudas escríbenos por WhatsApp al 943 04 87 83.");
+      return;
+    }
+
+    // Construir beneficios
+    const benefits = buildBenefits(svc);
+
+    // Registrar cliente
+    const res = await fetch(SUPABASE_URL + "/rest/v1/clients", {
+      method:  "POST",
+      headers: { ...headers, "Prefer": "return=representation" },
+      body: JSON.stringify({
+        name, phone, email,
+        since:    formatSince(),
+        pet, species, svc,
+        pet_bday: petBday || null,
+        notes:    "",
+        benefits
+      })
+    });
+
+    if (!res.ok) throw new Error(await res.text());
+
+    showConfirmation({ name, benefits });
+
+  } catch(e) {
+    btn.disabled = false;
+    btn.textContent = "Unirme a Familia Canexion";
+    alert("Error de conexión. Comprueba tu conexión e inténtalo de nuevo.");
+  }
+}
+
+// ── CONSTRUIR BENEFICIOS PARA EL CLIENTE ─────────────────
+function buildBenefits(svc) {
+  const benefits = [...benefitTemplates]
+    .sort((a, b) => a.order_index - b.order_index)
+    .map(t => ({
+      id:     "b" + t.id,
+      name:   t.name,
+      desc:   t.description,
+      status: t.dot_type === "always" ? "always" : "active",
+      dot:    t.dot_type === "always" ? "always" : "active"
+    }));
+
+  const coupon = discoveryCoupons.find(c => c.svc === svc);
+  if (coupon && coupon.active && coupon.name) {
+    benefits.splice(2, 0, {
+      id:       "disc_" + svc,
+      name:     coupon.name,
+      desc:     coupon.description,
+      discount: coupon.discount,
+      status:   "active",
+      dot:      "active"
+    });
+  }
+  return benefits;
+}
+
+// ── PANTALLA DE CONFIRMACIÓN ──────────────────────────────
+function showConfirmation(client) {
+  document.getElementById("form-screen").style.display    = "none";
+  document.getElementById("confirm-screen").style.display = "block";
+  document.getElementById("conf-name").textContent        = client.name.split(" ")[0];
+  window.scrollTo(0, 0);
+
+  const benefits = client.benefits || [];
+  document.getElementById("conf-benefits").innerHTML = benefits.map(b => {
+    const isActive = b.status === "active";
+    const badge = isActive
+      ? '<span class="br-badge new">Disponible ahora</span>'
+      : '<span class="br-badge always">Siempre activo</span>';
+    return `<div class="benefit-row">
+      <div class="br-dot ${isActive ? 'active' : 'always'}"></div>
+      <div class="br-body">
+        <div class="br-name">${b.name}</div>
+        <div class="br-desc">${b.desc || ""}</div>
+      </div>
+      ${badge}
+    </div>`;
+  }).join("");
+}
+
+// ── HELPERS ───────────────────────────────────────────────
+function formatSince() {
+  const ms = ["ene","feb","mar","abr","may","jun","jul","ago","sep","oct","nov","dic"];
+  const d  = new Date();
+  return ms[d.getMonth()] + " " + d.getFullYear();
+}
+</script>
+</body>
+</html>
