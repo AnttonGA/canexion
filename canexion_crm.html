@@ -253,6 +253,22 @@ input:checked+.togslider:before{transform:translateX(16px);}
 .modal-pet-block{background:var(--gg);border:1px solid var(--bd);border-radius:var(--rs);padding:12px 14px;margin-bottom:8px;}
 .modal-pet-block-title{font-family:'DM Mono',monospace;font-size:10px;font-weight:500;color:var(--gm);margin-bottom:8px;letter-spacing:.06em;text-transform:uppercase;}
 
+/* RECOMENDACIONES */
+.recs-panel{padding:0 20px 10px;}
+.recs-progress{background:var(--gg);border:1px solid var(--bd);border-radius:var(--rs);padding:12px 14px;margin-bottom:10px;font-size:13px;color:var(--ts);}
+.recs-progress-bar{height:4px;background:var(--bd);border-radius:2px;margin-top:8px;overflow:hidden;}
+.recs-progress-fill{height:100%;background:var(--gs);border-radius:2px;transition:width .3s;}
+.rec-card{background:var(--sf);border:1px solid var(--bd);border-radius:var(--r);padding:14px 16px;margin-bottom:8px;}
+.rec-top{display:flex;align-items:flex-start;gap:10px;}
+.rec-icon{font-size:22px;flex-shrink:0;line-height:1;}
+.rec-body{flex:1;min-width:0;}
+.rec-title{font-size:14px;font-weight:500;color:var(--tp);}
+.rec-desc{font-size:12px;color:var(--ts);margin-top:3px;line-height:1.5;}
+.rec-impact{font-family:'DM Mono',monospace;font-size:11px;font-weight:500;color:var(--gm);background:var(--gg);padding:2px 8px;border-radius:20px;white-space:nowrap;flex-shrink:0;}
+.rec-suggestion{font-size:12px;color:var(--ts);background:var(--gg);border-left:3px solid var(--gs);padding:8px 10px;border-radius:0 var(--rs) var(--rs) 0;margin-top:10px;font-style:italic;}
+.rec-actions{display:flex;justify-content:flex-end;margin-top:10px;}
+.recs-empty{text-align:center;padding:24px;font-size:13px;color:var(--tm);}
+
 /* WAKYMA PANEL */
 .wk-panel-sec{padding:18px 20px 0;}
 .wk-panel-header{display:flex;align-items:center;gap:8px;margin-bottom:9px;}
@@ -373,8 +389,13 @@ input:checked+.togslider:before{transform:translateX(16px);}
   <div id="sc" class="screen">
     <div class="camp-header">
       <div class="camp-header-title">Campañas y cupones</div>
-      <button class="new-camp-btn" onclick="openCampModal()">+ Nueva campaña</button>
+      <div style="display:flex;gap:8px;">
+        <button class="camp-act-btn" onclick="openRecsPanel()" id="recs-btn">💡 Sugerencias</button>
+        <button class="new-camp-btn" onclick="openCampModal()">+ Nueva campaña</button>
+      </div>
     </div>
+    <!-- Panel de recomendaciones (oculto por defecto) -->
+    <div id="recs-panel" class="recs-panel" style="display:none;padding-top:12px;"></div>
     <div class="camp-list" id="camp-list">
       <div class="loading-state"><div class="spinner"></div>Cargando campañas...</div>
     </div>
@@ -555,7 +576,19 @@ const SUPABASE_KEY = "sb_publishable_wwY0Zcd-sxz5Gqr_NJ7zhg_5OkSiCU0";
 const WAKYMA_KEY = "0jIXmFzxFwMEy5U2BlEvj3dgGuL0pcDasLKfsmXgD-NkYEiX";
 const WAKYMA_URL = "https://api.wakyma.com";
 
+// Rate limiter — nunca supera 28 llamadas/minuto (límite API: 30)
+const _wkTS = [];
+const WK_MAX = 28;
+
 async function wk(endpoint) {
+  while (true) {
+    const now = Date.now();
+    while (_wkTS.length && now - _wkTS[0] > 60000) _wkTS.shift();
+    if (_wkTS.length < WK_MAX) break;
+    const wait = _wkTS[0] + 60000 - now + 200;
+    await new Promise(r => setTimeout(r, Math.max(wait, 100)));
+  }
+  _wkTS.push(Date.now());
   const r = await fetch("/.netlify/functions/wk-proxy?e=" + encodeURIComponent(endpoint));
   if (!r.ok) throw new Error("Wakyma HTTP " + r.status);
   return r.json();
@@ -580,11 +613,14 @@ async function fetchWkStats(phone) {
     const pad  = n => String(n).padStart(2,"0");
     const d    = new Date();
     const todayDMY = `${pad(d.getDate())}-${pad(d.getMonth()+1)}-${d.getFullYear()}`;
+    const todayISO = d.toISOString().split("T")[0];
+    const yr1ago   = new Date(d); yr1ago.setFullYear(yr1ago.getFullYear() - 1);
+    const yr1agoISO = yr1ago.toISOString().split("T")[0];
 
     const [apptAllRes, apptYearRes, salesRes] = await Promise.all([
       wk(`/api/v3/appointments?clientId=${wkId}`),
       wk(`/api/v3/appointments?clientId=${wkId}&dateFrom=01-01-${year}&dateUntil=${todayDMY}`),
-      wk(`/api/v3/sales?clientId=${wkId}&dateFrom=${year}-01-01&dateUntil=${year}-12-31`)
+      wk(`/api/v3/sales?clientId=${wkId}&dateFrom=${yr1agoISO}&dateUntil=${todayISO}`)
     ]);
 
     const apptAll  = Array.isArray(apptAllRes)  ? apptAllRes  : (apptAllRes.data  || []);
@@ -599,8 +635,9 @@ async function fetchWkStats(phone) {
 
     const visitsThisYear = apptYear.filter(a => a.state === 4).length;
     const spentThisYear  = sales.reduce((s, x) => s + parseFloat(x.total || x.amount || 0), 0);
+    const hasActivity    = sales.length > 0; // compra en los últimos 12 meses
 
-    wkCache[p] = { wkId, lastVisitDaysAgo, visitsThisYear, spentThisYear };
+    wkCache[p] = { wkId, lastVisitDaysAgo, visitsThisYear, spentThisYear, hasActivity };
     return wkCache[p];
   } catch(e) { wkCache[p] = null; return null; }
 }
@@ -1024,7 +1061,7 @@ async function loadWakymaPanel(phone) {
     panelEl.innerHTML = `
       <div class="wk-cell"><div class="wk-label">Última visita</div><div class="wk-val">${lastStr}</div></div>
       <div class="wk-cell"><div class="wk-label">Próxima cita</div><div class="wk-val">${nextStr}</div></div>
-      <div class="wk-cell"><div class="wk-label">Gasto ${year}</div><div class="wk-val">${spent.toFixed(2)} €</div></div>
+      <div class="wk-cell"><div class="wk-label">Gasto (12 meses)</div><div class="wk-val">${spent.toFixed(2)} €</div></div>
       <div class="wk-cell"><div class="wk-label">Recordatorios</div>
         <div class="wk-val${remN>0?" warn":""}">${remN>0 ? remN+" pendiente"+(remN>1?"s":"") : "Al día"}</div>
         ${remN>0 ? '<div class="wk-badge">⚠ Revisar</div>' : ""}
@@ -1564,6 +1601,208 @@ async function saveDisc() {
     showToast("Cupón guardado ✓");
   } catch(e) { showToast("Error: " + e.message, true); }
   btn.disabled = false; btn.textContent = "Guardar cupón";
+}
+
+// ── MOTOR DE RECOMENDACIONES ─────────────────────────────
+
+function analyzePatterns(members, wkMap) {
+  // wkMap: phone → stats | null  (solo clientes activos en los últimos 12 meses)
+  const active = members.filter(m => {
+    const s = wkMap[(m.phone||"").replace(/\D/g,"")];
+    return s && s.hasActivity;
+  });
+  const recs = [];
+
+  // 1 — Sin visita en >60 días
+  const noVisit = active.filter(m => {
+    const s = wkMap[m.phone.replace(/\D/g,"")];
+    return s && s.lastVisitDaysAgo !== null && s.lastVisitDaysAgo > 60;
+  });
+  if (noVisit.length >= 1) recs.push({
+    icon:"📅", impact: noVisit.length,
+    title: "Clientes sin visita reciente",
+    desc:  `${noVisit.length} miembro${noVisit.length>1?"s":""} activo${noVisit.length>1?"s":""} lleva${noVisit.length>1?"n":""} más de 60 días sin visitar la clínica.`,
+    suggestion: '"¡Te echamos de menos! 15% de descuento en tu próxima visita"',
+    conditions: [{ field:"wkNoVisitDays", value:"60" }],
+    campName:"Reactivación — Vuelve a vernos", campDesc:"15% en tu próxima visita", campDisc:"15% de descuento"
+  });
+
+  // 2 — Solo clínica, sin tienda
+  const clinicOnly = active.filter(m => m.svcArray.length === 1 && m.svcArray.includes("clinica"));
+  if (clinicOnly.length >= 1) recs.push({
+    icon:"🛒", impact: clinicOnly.length,
+    title: "Clientes de clínica sin conocer la tienda",
+    desc:  `${clinicOnly.length} miembro${clinicOnly.length>1?"s":""} solo usa${clinicOnly.length>1?"n":""} la clínica. Son candidatos perfectos para descubrir la tienda.`,
+    suggestion: '"Primera compra en tienda con 20% de descuento"',
+    conditions: [{ field:"svc", value:"clinica" }],
+    campName:"Descubre nuestra tienda", campDesc:"20% en primera compra en tienda", campDisc:"20% de descuento"
+  });
+
+  // 3 — Gatos sin peluquería
+  const catNoGroom = active.filter(m => m.pets.some(p=>p.species==="Gato") && !m.svcArray.includes("peluqueria"));
+  if (catNoGroom.length >= 1) recs.push({
+    icon:"✂️", impact: catNoGroom.length,
+    title: "Dueños de gatos sin servicio de peluquería",
+    desc:  `${catNoGroom.length} miembro${catNoGroom.length>1?"s":""} tiene${catNoGroom.length>1?"n":""} gato y no usa${catNoGroom.length>1?"n":""} la peluquería.`,
+    suggestion: '"Primer baño y corte para tu gato con 25% de descuento"',
+    conditions: [{ field:"species", value:"Gato" }],
+    campName:"Peluquería felina — Primera vez", campDesc:"25% en primer baño y corte para gatos", campDisc:"25% de descuento"
+  });
+
+  // 4 — Cumpleaños próximos (30 días) — sólo activos
+  const bdays = active.filter(m => m.pets.some(p => checkBirthdayDays(p.pet_bday, 30)));
+  if (bdays.length >= 1) recs.push({
+    icon:"🎂", impact: bdays.length,
+    title: "Mascotas con cumpleaños en los próximos 30 días",
+    desc:  `${bdays.length} mascota${bdays.length>1?"s":""} de miembros activos cumplen años este mes.`,
+    suggestion: '"¡Feliz cumpleaños! Un regalo especial para tu peludo"',
+    conditions: [{ field:"birthdayDays", value:"30" }],
+    campName:"Feliz cumpleaños 🎂", campDesc:"Regalo de cumpleaños para tu mascota", campDisc:"Regalo sorpresa"
+  });
+
+  // 5 — Alto gasto (>200€ en 12 meses) sin reconocimiento VIP
+  const highSpend = active.filter(m => {
+    const s = wkMap[m.phone.replace(/\D/g,"")];
+    return s && s.spentThisYear > 200 && !(m.benefits||[]).some(b=>b.dot==="campaign"&&b.status==="active");
+  });
+  if (highSpend.length >= 1) recs.push({
+    icon:"⭐", impact: highSpend.length,
+    title: "Clientes de alto valor sin reconocimiento",
+    desc:  `${highSpend.length} miembro${highSpend.length>1?"s":""} ha${highSpend.length>1?"n":""} gastado más de 200€ en el último año y no tiene${highSpend.length>1?"n":""} ningún cupón de campaña activo.`,
+    suggestion: '"Gracias por tu confianza — acceso exclusivo a beneficios VIP"',
+    conditions: [{ field:"wkSpentGt", value:"200" }],
+    campName:"Clientes VIP — Gracias", campDesc:"Beneficio exclusivo por tu fidelidad", campDisc:"Descuento VIP especial"
+  });
+
+  // 6 — Miembros veteranos (>12 meses) sin campaña activa
+  const loyal = active.filter(m => getSinceMonths(m.since) > 12 && !(m.benefits||[]).some(b=>b.dot==="campaign"&&b.status==="active"));
+  if (loyal.length >= 1) recs.push({
+    icon:"💎", impact: loyal.length,
+    title: "Miembros veteranos sin campaña activa",
+    desc:  `${loyal.length} miembro${loyal.length>1?"s":""} lleva${loyal.length>1?"n":""} más de un año en Familia Canexion sin ningún cupón de campaña activo.`,
+    suggestion: '"Un año juntos — gracias por ser familia Canexion"',
+    conditions: [{ field:"sinceMonthsGt", value:"12" }],
+    campName:"1 año en familia — ¡Gracias!", campDesc:"Aniversario como miembro de Familia Canexion", campDisc:"Sorpresa especial"
+  });
+
+  // 7 — Beneficios activos sin canjear
+  const unclaimed = active.filter(m => (m.benefits||[]).some(b=>b.status==="active"&&b.dot!=="always"));
+  if (unclaimed.length >= 2) recs.push({
+    icon:"🎁", impact: unclaimed.length,
+    title: "Miembros con beneficios sin canjear",
+    desc:  `${unclaimed.length} miembros activos tienen beneficios disponibles que aún no han usado.`,
+    suggestion: '"¡Tienes un regalo esperándote! No dejes que caduque"',
+    conditions: [],
+    campName:"Recuerda tu regalo", campDesc:"Tienes beneficios activos que puedes canjear ahora", campDisc:"Beneficio ya disponible"
+  });
+
+  return recs.sort((a, b) => b.impact - a.impact);
+}
+
+function renderRecs(recs) {
+  const panel = document.getElementById("recs-panel");
+  if (!recs.length) {
+    panel.innerHTML = '<div class="recs-empty">✅ No se detectan oportunidades claras con los datos actuales. ¡Todo parece al día!</div>';
+    return;
+  }
+  panel.innerHTML = recs.map((r, i) => `
+    <div class="rec-card">
+      <div class="rec-top">
+        <div class="rec-icon">${r.icon}</div>
+        <div class="rec-body">
+          <div class="rec-title">${r.title}</div>
+          <div class="rec-desc">${r.desc}</div>
+        </div>
+        <div class="rec-impact">${r.impact} miembro${r.impact>1?"s":""}</div>
+      </div>
+      <div class="rec-suggestion">💬 Idea: ${r.suggestion}</div>
+      <div class="rec-actions">
+        <button class="camp-act-btn primary" onclick="openCampFromRec(${i})">Crear esta campaña →</button>
+      </div>
+    </div>`).join("");
+  // Guardamos las recs en una variable global para poder recuperarlas al crear campaña
+  window._lastRecs = recs;
+}
+
+async function openRecsPanel() {
+  const panel  = document.getElementById("recs-panel");
+  const btn    = document.getElementById("recs-btn");
+  // Toggle: si ya está abierto, cerrar
+  if (panel.style.display !== "none") {
+    panel.style.display = "none";
+    btn.textContent = "💡 Sugerencias";
+    return;
+  }
+  panel.style.display = "block";
+  btn.textContent = "⏳ Analizando...";
+  btn.disabled = true;
+
+  // Progreso
+  const total = clients.length;
+  panel.innerHTML = `
+    <div class="recs-progress" id="recs-prog">
+      <span id="recs-prog-txt">Consultando Wakyma: 0 / ${total} miembros…</span>
+      <div class="recs-progress-bar"><div class="recs-progress-fill" id="recs-prog-fill" style="width:0%"></div></div>
+    </div>`;
+
+  // Fetch stats para todos los clientes en serie (respeta rate limit automáticamente)
+  const wkMap = {};
+  for (let i = 0; i < clients.length; i++) {
+    const c = clients[i];
+    const stats = await fetchWkStats(c.phone);
+    wkMap[(c.phone||"").replace(/\D/g,"")] = stats;
+    // Actualizar progreso
+    const pct = Math.round(((i+1)/total)*100);
+    const progEl = document.getElementById("recs-prog-txt");
+    const fillEl = document.getElementById("recs-prog-fill");
+    if (progEl) progEl.textContent = `Consultando Wakyma: ${i+1} / ${total} miembros…`;
+    if (fillEl) fillEl.style.width = pct + "%";
+  }
+
+  // Analizar y renderizar
+  const recs = analyzePatterns(clients, wkMap);
+  renderRecs(recs);
+  btn.textContent = "💡 Sugerencias";
+  btn.disabled = false;
+}
+
+function openCampFromRec(idx) {
+  const rec = (window._lastRecs || [])[idx];
+  if (!rec) return;
+  // Reset modal
+  campCoupon = null; previewedClients = [];
+  ["cname","cdesc","cdisc","cexp"].forEach(id => document.getElementById(id).value = "");
+  document.getElementById("cond-list").innerHTML = "";
+  document.getElementById("wa-section").style.display = "none";
+  document.getElementById("camp-step1").style.display = "block";
+  document.getElementById("camp-step2").classList.add("camp-step-hidden");
+  // Pre-rellenar paso 1
+  document.getElementById("cname").value = rec.campName;
+  document.getElementById("cdesc").value = rec.campDesc;
+  document.getElementById("cdisc").value = rec.campDisc;
+  openModal("modal-camp");
+  // Avanzar a paso 2
+  goToCampStep2();
+  // Añadir condiciones pre-configuradas
+  (rec.conditions || []).forEach(cond => addConditionWithValue(cond.field, cond.value));
+  runPreview();
+}
+
+function addConditionWithValue(field, value) {
+  const list = document.getElementById("cond-list");
+  const div  = document.createElement("div");
+  div.className = "cond-row";
+  div.innerHTML = `
+    <select onchange="updateCondValueInput(this)">${condFields.map(f => `<option value="${f.value}"${f.value===field?" selected":""}>${f.label}</option>`).join("")}</select>
+    <div class="cond-val-wrap">${buildCondValueControl(field)}</div>
+    <button class="cond-del" onclick="this.parentNode.remove();autoPreview()">✕</button>`;
+  list.appendChild(div);
+  const valCtrl = div.querySelector(".cond-val");
+  if (valCtrl) {
+    valCtrl.value = value;
+    valCtrl.addEventListener("input",  autoPreview);
+    valCtrl.addEventListener("change", autoPreview);
+  }
 }
 
 // ── MODALES ───────────────────────────────────────────────
