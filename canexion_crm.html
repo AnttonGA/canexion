@@ -229,6 +229,26 @@ input:checked+.togslider:before{transform:translateX(16px);}
 .wa-btn{background:#25d366;border:none;border-radius:20px;padding:6px 12px;font-family:'DM Sans',sans-serif;font-size:11px;font-weight:500;color:white;cursor:pointer;white-space:nowrap;text-decoration:none;display:inline-block;}
 .camp-step-hidden{display:none;}
 
+/* PREVIEW SIEMPRE VISIBLE */
+.preview-always{background:var(--gg);border:1px solid var(--bd);border-radius:var(--rs);padding:12px 14px;margin:12px 0;}
+.preview-always .preview-title{font-size:12px;font-weight:500;color:var(--gm);margin-bottom:6px;}
+.preview-always .preview-count{font-size:26px;font-weight:500;color:var(--tp);display:inline;}
+.preview-always .preview-unit{font-size:13px;color:var(--tm);margin-left:5px;}
+.preview-names{margin-top:8px;display:flex;flex-direction:column;gap:3px;max-height:120px;overflow-y:auto;}
+.preview-name{font-size:12px;color:var(--ts);}
+
+/* EDITOR WA */
+.wa-editor{margin-top:10px;}
+.wa-editor-label{font-size:12px;font-weight:500;color:var(--ts);margin-bottom:4px;display:block;}
+.wa-editor-vars{font-size:11px;color:var(--tm);margin-bottom:6px;}
+.wa-editor-vars code{background:var(--gg);padding:1px 5px;border-radius:4px;font-family:'DM Mono',monospace;}
+.wa-tarea{width:100%;background:var(--bg);border:1px solid var(--bd);border-radius:var(--rs);padding:10px 13px;font-family:'DM Sans',sans-serif;font-size:13px;color:var(--tp);resize:vertical;min-height:120px;outline:none;line-height:1.5;}
+.wa-tarea:focus{border-color:var(--gs);}
+
+/* COND VALUE CONTROL */
+.cond-val-wrap{flex:1;min-width:0;}
+.cond-val-wrap select,.cond-val-wrap input{width:100%;background:var(--sf);border:1px solid var(--bd);border-radius:var(--rs);padding:4px 8px;font-family:'DM Sans',sans-serif;font-size:13px;color:var(--tp);outline:none;}
+
 /* PET BLOCKS (modal alta) */
 .modal-pet-block{background:var(--gg);border:1px solid var(--bd);border-radius:var(--rs);padding:12px 14px;margin-bottom:8px;}
 .modal-pet-block-title{font-family:'DM Mono',monospace;font-size:10px;font-weight:500;color:var(--gm);margin-bottom:8px;letter-spacing:.06em;text-transform:uppercase;}
@@ -424,20 +444,27 @@ input:checked+.togslider:before{transform:translateX(16px);}
       <span class="cancelink" onclick="closeModal('modal-camp')">Cancelar</span>
     </div>
     <div id="camp-step2" class="camp-step-hidden">
+      <!-- Segmentación -->
       <div class="fg">
         <label class="fl">Condiciones del segmento</label>
         <div class="cond-list" id="cond-list"></div>
         <button class="add-cond-btn" onclick="addCondition()">+ Añadir condición</button>
         <div style="font-size:11px;color:var(--tm);margin-top:6px;">Sin condiciones → se asigna a todos los miembros</div>
       </div>
-      <button class="subbtn" id="preview-btn" onclick="previewCampaign()" style="background:none;border:1px solid var(--bd);color:var(--ts);margin-top:0;">Ver previsualización del segmento</button>
-      <div id="preview-box" class="preview-box" style="display:none;">
+      <!-- Preview en tiempo real (siempre visible) -->
+      <div class="preview-always">
         <div class="preview-title">Miembros que recibirán este cupón</div>
-        <div class="preview-count" id="prev-count">0</div>
-        <div class="preview-sub" id="prev-sub"></div>
+        <span class="preview-count" id="prev-count">—</span>
+        <span class="preview-unit" id="prev-unit"></span>
         <div class="preview-names" id="prev-names"></div>
       </div>
-      <button class="subbtn" id="launch-btn" style="margin-top:10px;" onclick="launchCampaign()">Guardar campaña</button>
+      <!-- Editor mensaje WhatsApp -->
+      <div class="wa-editor">
+        <span class="wa-editor-label">Mensaje WhatsApp (editable)</span>
+        <div class="wa-editor-vars">Variables: <code>[NOMBRE]</code> <code>[CUPON]</code> <code>[DESCUENTO]</code> <code>[CADUCIDAD]</code></div>
+        <textarea class="wa-tarea" id="wa-msg-template" rows="6"></textarea>
+      </div>
+      <button class="subbtn" id="launch-btn" style="margin-top:12px;" onclick="launchCampaign()">Guardar campaña</button>
       <div id="wa-section" style="display:none;">
         <div style="font-size:13px;font-weight:500;color:var(--tp);margin-top:14px;margin-bottom:4px;">Enviar por WhatsApp</div>
         <div style="font-size:12px;color:var(--tm);margin-bottom:10px;">Haz clic en cada cliente para abrir el chat con el mensaje listo</div>
@@ -967,6 +994,7 @@ function renderCampaigns() {
   }
   el.innerHTML = campaigns.map(c => {
     const conds = (c.conditions||[]).length;
+    const rc    = c.recipient_count || 0;
     return `<div class="camp-card">
       <div class="camp-name">${c.name}</div>
       <div class="camp-desc">${c.description || ""}</div>
@@ -974,6 +1002,9 @@ function renderCampaigns() {
         <span class="camp-tag">${c.discount}</span>
         ${c.expiry ? `<span class="camp-tag expiry">Hasta ${c.expiry}</span>` : ""}
         <span class="camp-tag">${conds > 0 ? conds + " condición" + (conds > 1 ? "es" : "") : "Todos los miembros"}</span>
+        ${rc > 0
+          ? `<span class="camp-tag" style="background:var(--pup);color:var(--pu);">Enviada a ${rc} miembro${rc>1?"s":""}</span>`
+          : `<span class="camp-tag" style="background:var(--bg);color:var(--tm);">Sin asignar</span>`}
       </div>
     </div>`;
   }).join("");
@@ -982,12 +1013,16 @@ function renderCampaigns() {
 function openCampModal() {
   campCoupon = null; previewedClients = [];
   ["cname","cdesc","cdisc","cexp"].forEach(id => document.getElementById(id).value = "");
-  document.getElementById("cond-list").innerHTML        = "";
-  document.getElementById("preview-box").style.display  = "none";
-  document.getElementById("launch-btn").textContent     = "Guardar campaña";
-  document.getElementById("launch-btn").style.background = "var(--gm)";
-  document.getElementById("wa-section").style.display   = "none";
-  document.getElementById("camp-step1").style.display   = "block";
+  document.getElementById("cond-list").innerHTML          = "";
+  document.getElementById("prev-count").textContent       = "—";
+  document.getElementById("prev-unit").textContent        = "";
+  document.getElementById("prev-names").innerHTML         = "";
+  document.getElementById("wa-msg-template").value        = "";
+  document.getElementById("launch-btn").textContent       = "Guardar campaña";
+  document.getElementById("launch-btn").style.background  = "var(--gm)";
+  document.getElementById("launch-btn").style.display     = "";
+  document.getElementById("wa-section").style.display     = "none";
+  document.getElementById("camp-step1").style.display     = "block";
   document.getElementById("camp-step2").classList.add("camp-step-hidden");
   openModal("modal-camp");
 }
@@ -997,39 +1032,77 @@ function goToCampStep2() {
   const desc = document.getElementById("cdesc").value.trim();
   const disc = document.getElementById("cdisc").value.trim();
   if (!name || !desc || !disc) { showToast("Rellena nombre, descripción y descuento", true); return; }
-  campCoupon = { id: "c_"+Date.now(), name, desc: disc, expiry: document.getElementById("cexp").value || null, status: "active", dot: "campaign" };
+  const expiry = document.getElementById("cexp").value || null;
+  campCoupon = { id: "c_"+Date.now(), name, desc: disc, expiry, status: "active", dot: "campaign" };
+
+  // Rellenar template del mensaje WA
+  document.getElementById("wa-msg-template").value =
+    `Hola [NOMBRE] 👋\n\nTienes un nuevo beneficio en Familia Canexion:\n\n🎁 *${name}*\n${disc}` +
+    (expiry ? `\n\nVálido hasta: ${expiry}` : "") +
+    `\n\nPuedes canjearlo en nuestra tienda. ¡Hasta pronto! 🐾`;
+
   document.getElementById("camp-step1").style.display = "none";
   document.getElementById("camp-step2").classList.remove("camp-step-hidden");
   document.getElementById("camp-step2").style.display = "block";
+  // Arrancar preview con todos los clientes (sin condiciones aún)
+  runPreview();
 }
 
 const condFields = [
-  { value:"species",       label:"Especie es",                   options:[{v:"Perro",l:"Perro"},{v:"Gato",l:"Gato"},{v:"Otro",l:"Otro"}] },
-  { value:"svc",           label:"Servicio que usa",             options:[{v:"clinica",l:"Clínica"},{v:"tienda",l:"Tienda"},{v:"peluqueria",l:"Peluquería"}] },
-  { value:"petAgeGt",      label:"Edad mascota > (años)" },
-  { value:"petAgeLt",      label:"Edad mascota < (años)" },
-  { value:"birthdayDays",  label:"Cumpleaños en próximos X días" },
-  { value:"sinceMonthsGt", label:"Miembro hace > (meses)" },
-  { value:"sinceMonthsLt", label:"Miembro hace < (meses)" },
+  { value:"species",       label:"Especie es",                    opts:[{v:"Perro",l:"Perro"},{v:"Gato",l:"Gato"},{v:"Otro",l:"Otro"}] },
+  { value:"svc",           label:"Servicio que usa",              opts:[{v:"clinica",l:"Clínica"},{v:"tienda",l:"Tienda"},{v:"peluqueria",l:"Peluquería"}] },
+  { value:"petAgeGt",      label:"Edad mascota mayor que (años)", num:true, min:0, max:25, ph:"ej. 3" },
+  { value:"petAgeLt",      label:"Edad mascota menor que (años)", num:true, min:0, max:25, ph:"ej. 1" },
+  { value:"birthdayDays",  label:"Cumpleaños en próximos X días", num:true, min:1, max:90, ph:"ej. 30" },
+  { value:"sinceMonthsGt", label:"Miembro hace más de (meses)",   num:true, min:0, ph:"ej. 6" },
+  { value:"sinceMonthsLt", label:"Miembro hace menos de (meses)", num:true, min:0, ph:"ej. 3" },
+  { value:"postal_code",   label:"Código postal es",              ph:"ej. 20001" },
 ];
 
+// Crea el control de valor adecuado para el campo seleccionado
+function buildCondValueControl(field) {
+  const def = condFields.find(f => f.value === field) || {};
+  if (def.opts) {
+    return `<select class="cond-val">${def.opts.map(o => `<option value="${o.v}">${o.l}</option>`).join("")}</select>`;
+  }
+  const type = def.num ? "number" : "text";
+  const min  = def.min !== undefined ? `min="${def.min}"` : "";
+  const max  = def.max !== undefined ? `max="${def.max}"` : "";
+  const ph   = def.ph  ? `placeholder="${def.ph}"` : `placeholder="valor"`;
+  return `<input class="cond-val" type="${type}" ${min} ${max} ${ph}/>`;
+}
+
+// Actualiza el control de valor al cambiar el campo seleccionado
+function updateCondValueInput(sel) {
+  const wrap = sel.parentNode.querySelector(".cond-val-wrap");
+  wrap.innerHTML = buildCondValueControl(sel.value);
+  autoPreview();
+}
+
 function addCondition() {
-  const list = document.getElementById("cond-list");
-  const idx  = list.children.length;
-  const div  = document.createElement("div");
-  div.className = "cond-row"; div.id = "cond-"+idx;
+  const list  = document.getElementById("cond-list");
+  const field = condFields[0].value;
+  const div   = document.createElement("div");
+  div.className = "cond-row";
   div.innerHTML = `
-    <select>${condFields.map(f => `<option value="${f.value}">${f.label}</option>`).join("")}</select>
-    <input id="cond-val-${idx}" type="text" placeholder="valor"/>
-    <button class="cond-del" onclick="this.parentNode.remove()">✕</button>`;
+    <select onchange="updateCondValueInput(this)">${condFields.map(f => `<option value="${f.value}">${f.label}</option>`).join("")}</select>
+    <div class="cond-val-wrap">${buildCondValueControl(field)}</div>
+    <button class="cond-del" onclick="this.parentNode.remove();autoPreview()">✕</button>`;
   list.appendChild(div);
+  // Escuchar cambios en el control de valor para preview en tiempo real
+  div.querySelector(".cond-val").addEventListener("input", autoPreview);
+  div.querySelector(".cond-val").addEventListener("change", autoPreview);
+  autoPreview();
 }
 
 function getConditions() {
-  return Array.from(document.getElementById("cond-list").children).map(row => ({
-    field: row.querySelector("select").value,
-    value: row.querySelector("input").value.trim()
-  })).filter(c => c.value);
+  return Array.from(document.getElementById("cond-list").children).map(row => {
+    const fieldSel = row.querySelector("select");
+    const valCtrl  = row.querySelector(".cond-val");
+    if (!fieldSel || !valCtrl) return null;
+    const val = valCtrl.value ? valCtrl.value.trim() : "";
+    return val ? { field: fieldSel.value, value: val } : null;
+  }).filter(Boolean);
 }
 
 function matchesConditions(client, conditions) {
@@ -1042,28 +1115,37 @@ function matchesConditions(client, conditions) {
       case "birthdayDays":  return client.pets.some(p => checkBirthdayDays(p.pet_bday, parseInt(cond.value)));
       case "sinceMonthsGt": return getSinceMonths(client.since) > parseInt(cond.value);
       case "sinceMonthsLt": return getSinceMonths(client.since) < parseInt(cond.value);
+      case "postal_code":   return (client.postal_code || "") === cond.value;
       default: return true;
     }
   });
 }
 
-function previewCampaign() {
+// Preview debounced — se llama automáticamente al cambiar condiciones
+let _previewTimer = null;
+function autoPreview() {
+  clearTimeout(_previewTimer);
+  _previewTimer = setTimeout(runPreview, 280);
+}
+
+function runPreview() {
   const conds      = getConditions();
   previewedClients = clients.filter(c => matchesConditions(c, conds));
   const count      = previewedClients.length;
   document.getElementById("prev-count").textContent = count;
-  document.getElementById("prev-sub").textContent   = count === 1 ? "miembro recibirá este cupón" : "miembros recibirán este cupón";
+  document.getElementById("prev-unit").textContent  = count === 1 ? "miembro" : "miembros";
   document.getElementById("prev-names").innerHTML   =
-    previewedClients.slice(0,10).map(c => `<div class="preview-name">· ${c.name} (${c.pets.map(p=>p.name).join(", ")})</div>`).join("") +
-    (previewedClients.length > 10 ? `<div class="preview-name" style="color:var(--tm)">...y ${previewedClients.length-10} más</div>` : "");
-  document.getElementById("preview-box").style.display = "block";
+    previewedClients.slice(0,8).map(c => `<div class="preview-name">· ${c.name} (${c.pets.map(p=>p.name).join(", ")})</div>`).join("") +
+    (previewedClients.length > 8 ? `<div class="preview-name" style="color:var(--tm)">...y ${previewedClients.length-8} más</div>` : "");
   const lb = document.getElementById("launch-btn");
-  if (count > 0) {
-    lb.textContent      = "Lanzar campaña — " + count + " miembro" + (count > 1 ? "s" : "");
-    lb.style.background = "var(--pu)";
-  } else {
-    lb.textContent      = "Guardar campaña (sin asignar)";
-    lb.style.background = "var(--gm)";
+  if (lb) {
+    if (count > 0) {
+      lb.textContent      = "Lanzar campaña — " + count + " miembro" + (count > 1 ? "s" : "");
+      lb.style.background = "var(--pu)";
+    } else {
+      lb.textContent      = "Guardar campaña (sin asignar)";
+      lb.style.background = "var(--gm)";
+    }
   }
 }
 
@@ -1071,27 +1153,37 @@ async function launchCampaign() {
   const btn = document.getElementById("launch-btn");
   btn.disabled = true; btn.textContent = "Lanzando...";
   try {
+    const recipientCount = previewedClients.length;
     await sb("POST", "campaigns", { body: {
-      name: campCoupon.name, description: campCoupon.name,
-      discount: campCoupon.desc,
-      expiry:   campCoupon.expiry || null,
-      conditions: getConditions()
+      name:            campCoupon.name,
+      description:     campCoupon.name,
+      discount:        campCoupon.desc,
+      expiry:          campCoupon.expiry || null,
+      conditions:      getConditions(),
+      recipient_count: recipientCount
     }});
+
+    // Asignar beneficio a cada cliente — con protección anti-duplicados
     for (const c of previewedClients) {
       const client = clients.find(cl => cl.id === c.id.toString());
       if (client) {
-        client.benefits = [...(client.benefits||[]), {...campCoupon}];
-        await sb("PATCH", "clients", { filter: "id=eq." + c.id, body: { benefits: client.benefits } });
+        const alreadyHas = (client.benefits||[]).some(b => b.name === campCoupon.name);
+        if (!alreadyHas) {
+          client.benefits = [...(client.benefits||[]), {...campCoupon}];
+          await sb("PATCH", "clients", { filter: "id=eq." + c.id, body: { benefits: client.benefits } });
+        }
       }
     }
+
     const cpd = await sb("GET", "campaigns", { order: "created_at.desc" });
     campaigns = cpd || [];
     renderCampaigns();
     renderList(filtered);
-    if (previewedClients.length > 0) {
+
+    if (recipientCount > 0) {
       showWaList(previewedClients, campCoupon);
       btn.style.display = "none";
-      showToast("Campaña lanzada — " + previewedClients.length + " miembro" + (previewedClients.length > 1 ? "s" : "") + " ✓");
+      showToast("Campaña lanzada — " + recipientCount + " miembro" + (recipientCount > 1 ? "s" : "") + " ✓");
     } else {
       closeModal("modal-camp");
       showToast("Campaña guardada ✓");
@@ -1102,12 +1194,15 @@ async function launchCampaign() {
 
 function showWaList(list, coupon) {
   document.getElementById("wa-section").style.display = "block";
-  const base = "Hola [NOMBRE] 👋\n\nTienes un nuevo beneficio en Familia Canexion:\n\n🎁 *"+coupon.name+"*\n"+coupon.desc+
-    (coupon.expiry ? "\n\nVálido hasta: "+coupon.expiry : "")+"\n\nPuedes canjearlo en nuestra tienda. ¡Hasta pronto! 🐾";
+  // Usar el template editable por el usuario
+  const tpl = (document.getElementById("wa-msg-template").value || "")
+    .replace("[CUPON]",    coupon.name)
+    .replace("[DESCUENTO]",coupon.desc)
+    .replace("[CADUCIDAD]",coupon.expiry || "");
   document.getElementById("wa-list").innerHTML = list.map(c => {
     const phone     = (c.phone||"").toString().replace(/\D/g, "");
     const fullPhone = phone.startsWith("34") ? phone : "34"+phone;
-    const msg       = encodeURIComponent(base.replace("[NOMBRE]", c.name.split(" ")[0]));
+    const msg       = encodeURIComponent(tpl.replace("[NOMBRE]", c.name.split(" ")[0]));
     return `<div class="wa-item">
       <div class="wa-info"><div class="wa-name">${c.name}</div><div class="wa-phone">${c.phone}</div></div>
       <a class="wa-btn" href="https://wa.me/${fullPhone}?text=${msg}" target="_blank">WhatsApp</a>
