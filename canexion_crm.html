@@ -252,6 +252,16 @@ input:checked+.togslider:before{transform:translateX(16px);}
 /* PET BLOCKS (modal alta) */
 .modal-pet-block{background:var(--gg);border:1px solid var(--bd);border-radius:var(--rs);padding:12px 14px;margin-bottom:8px;}
 .modal-pet-block-title{font-family:'DM Mono',monospace;font-size:10px;font-weight:500;color:var(--gm);margin-bottom:8px;letter-spacing:.06em;text-transform:uppercase;}
+
+/* WAKYMA PANEL */
+.wk-panel-sec{padding:18px 20px 0;}
+.wk-panel-header{display:flex;align-items:center;gap:8px;margin-bottom:9px;}
+.wk-loading{font-size:11px;color:var(--tm);}
+.wk-cell{background:var(--sf);border:1px solid var(--bd);border-radius:var(--rs);padding:9px 13px;}
+.wk-label{font-size:11px;color:var(--tm);margin-bottom:2px;}
+.wk-val{font-size:13px;font-weight:500;color:var(--tp);}
+.wk-val.warn{color:#9a6010;}
+.wk-badge{display:inline-block;font-size:10px;font-weight:500;padding:2px 7px;border-radius:20px;background:var(--ap);color:#9a6010;margin-top:3px;}
 </style>
 </head>
 <body>
@@ -337,6 +347,14 @@ input:checked+.togslider:before{transform:translateX(16px);}
       <div class="seclabel">Código postal</div>
       <div class="pcval" id="pcp">—</div>
     </div>
+    <!-- Panel Wakyma -->
+    <div class="wk-panel-sec" id="wk-panel-sec">
+      <div class="wk-panel-header">
+        <div class="seclabel" style="margin-bottom:0;">Wakyma</div>
+        <span class="wk-loading" id="wk-loading"></span>
+      </div>
+      <div class="pgrid" id="wk-panel"></div>
+    </div>
     <!-- Beneficios -->
     <div class="sec" style="margin-top:18px;">
       <div class="seclabel">Beneficios y descuentos</div>
@@ -406,6 +424,14 @@ input:checked+.togslider:before{transform:translateX(16px);}
   <div class="msheet">
     <div class="mhandle"></div>
     <div class="mtitle">Nuevo miembro</div>
+    <!-- Importar desde Wakyma -->
+    <div class="fg" style="background:var(--gg);border:1px solid var(--bd);border-radius:var(--rs);padding:11px 13px;margin-bottom:14px;">
+      <div style="font-size:11px;color:var(--tm);margin-bottom:7px;">¿El cliente ya existe en Wakyma? Introduce su teléfono y pulsa Importar.</div>
+      <div style="display:flex;gap:8px;">
+        <input class="fi" id="fph-wk" type="tel" placeholder="6XX XXX XXX" style="flex:1;margin:0;"/>
+        <button class="camp-act-btn primary" id="wk-import-btn" onclick="searchWakyma()" type="button" style="white-space:nowrap;">🔍 Importar</button>
+      </div>
+    </div>
     <div class="fg"><label class="fl">Nombre completo *</label><input class="fi" id="fn" type="text" placeholder="Ej. Ane Etxeberria"/></div>
     <div class="fg"><label class="fl">Teléfono (WhatsApp) *</label><input class="fi" id="fph" type="tel" placeholder="6XX XXX XXX"/></div>
     <div class="fg"><label class="fl">Email (opcional)</label><input class="fi" id="fe" type="email" placeholder="email@ejemplo.com"/></div>
@@ -524,6 +550,70 @@ input:checked+.togslider:before{transform:translateX(16px);}
 // ── CONFIGURACIÓN ─────────────────────────────────────────
 const SUPABASE_URL = "https://lhvaonkibrfujdbbhkkr.supabase.co";
 const SUPABASE_KEY = "sb_publishable_wwY0Zcd-sxz5Gqr_NJ7zhg_5OkSiCU0";
+
+// ── WAKYMA ────────────────────────────────────────────────
+const WAKYMA_KEY = "0jIXmFzxFwMEy5U2BlEvj3dgGuL0pcDasLKfsmXgD-NkYEiX";
+const WAKYMA_URL = "https://api.wakyma.com";
+
+async function wk(endpoint) {
+  const r = await fetch(WAKYMA_URL + endpoint, {
+    headers: { "Authorization": "Bearer " + WAKYMA_KEY }
+  });
+  if (!r.ok) throw new Error("Wakyma HTTP " + r.status);
+  return r.json();
+}
+
+function wkSpecies(type) {
+  return type === 1 ? "Perro" : type === 2 ? "Gato" : "Otro";
+}
+
+const wkCache = {}; // phone normalizado → stats | null
+
+async function fetchWkStats(phone) {
+  const p = (phone || "").replace(/\D/g,"");
+  if (!p) return null;
+  if (p in wkCache) return wkCache[p];
+  try {
+    const cRes  = await wk("/api/v3/clients?phone=" + encodeURIComponent(p));
+    const cList = Array.isArray(cRes) ? cRes : (cRes.data || []);
+    if (!cList.length) { wkCache[p] = null; return null; }
+    const wkId = cList[0].id;
+    const year = new Date().getFullYear();
+    const pad  = n => String(n).padStart(2,"0");
+    const d    = new Date();
+    const todayDMY = `${pad(d.getDate())}-${pad(d.getMonth()+1)}-${d.getFullYear()}`;
+
+    const [apptAllRes, apptYearRes, salesRes] = await Promise.all([
+      wk(`/api/v3/appointments?clientId=${wkId}`),
+      wk(`/api/v3/appointments?clientId=${wkId}&dateFrom=01-01-${year}&dateUntil=${todayDMY}`),
+      wk(`/api/v3/sales?clientId=${wkId}&dateFrom=${year}-01-01&dateUntil=${year}-12-31`)
+    ]);
+
+    const apptAll  = Array.isArray(apptAllRes)  ? apptAllRes  : (apptAllRes.data  || []);
+    const apptYear = Array.isArray(apptYearRes) ? apptYearRes : (apptYearRes.data || []);
+    const sales    = Array.isArray(salesRes)    ? salesRes    : (salesRes.data    || []);
+
+    const lastDone = apptAll.filter(a => a.state === 4)
+      .sort((a,b) => new Date(b.date||b.startDate) - new Date(a.date||a.startDate))[0];
+    const lastVisitDaysAgo = lastDone
+      ? (Date.now() - new Date(lastDone.date||lastDone.startDate).getTime()) / 86400000
+      : null;
+
+    const visitsThisYear = apptYear.filter(a => a.state === 4).length;
+    const spentThisYear  = sales.reduce((s, x) => s + parseFloat(x.total || x.amount || 0), 0);
+
+    wkCache[p] = { wkId, lastVisitDaysAgo, visitsThisYear, spentThisYear };
+    return wkCache[p];
+  } catch(e) { wkCache[p] = null; return null; }
+}
+
+function fmtWkDate(d) {
+  if (!d) return "—";
+  const dt = new Date(d);
+  if (isNaN(dt)) return String(d);
+  const ms = ["ene","feb","mar","abr","may","jun","jul","ago","sep","oct","nov","dic"];
+  return dt.getDate() + " " + ms[dt.getMonth()] + " " + dt.getFullYear();
+}
 
 const PASSWORD    = "canexion2025";
 const SESSION_KEY = "fcx_auth";
@@ -838,6 +928,7 @@ function openProfile(id) {
   document.getElementById("fab").style.display        = "none";
   ["ss","sc","sb"].forEach(id => document.getElementById(id).classList.remove("active"));
   document.getElementById("sp").classList.add("active");
+  loadWakymaPanel(c.phone);
   window.scrollTo(0, 0);
 }
 
@@ -882,6 +973,68 @@ async function saveNote() {
   } catch(e) { showToast("Error al guardar", true); }
 }
 
+async function loadWakymaPanel(phone) {
+  const loadEl  = document.getElementById("wk-loading");
+  const panelEl = document.getElementById("wk-panel");
+  loadEl.textContent   = "cargando...";
+  loadEl.style.display = "inline";
+  panelEl.innerHTML    = "";
+  const p = (phone || "").replace(/\D/g,"");
+  if (!p) { loadEl.textContent = "Sin teléfono"; return; }
+  try {
+    const cRes  = await wk("/api/v3/clients?phone=" + encodeURIComponent(p));
+    const cList = Array.isArray(cRes) ? cRes : (cRes.data || []);
+    if (!cList.length) { loadEl.textContent = "No encontrado en Wakyma"; return; }
+    const wkId = cList[0].id;
+    const year = new Date().getFullYear();
+    const pad  = n => String(n).padStart(2,"0");
+    const d    = new Date();
+    const todayDMY = `${pad(d.getDate())}-${pad(d.getMonth()+1)}-${d.getFullYear()}`;
+
+    const [apptRes, salesRes, remRes, futureRes] = await Promise.all([
+      wk(`/api/v3/appointments?clientId=${wkId}`),
+      wk(`/api/v3/sales?clientId=${wkId}&dateFrom=${year}-01-01&dateUntil=${year}-12-31`),
+      wk(`/api/v3/reminders?clientId=${wkId}&state=0`),
+      wk(`/api/v3/appointments?clientId=${wkId}&dateFrom=${todayDMY}`)
+    ]);
+
+    const appts  = Array.isArray(apptRes)   ? apptRes   : (apptRes.data   || []);
+    const sales  = Array.isArray(salesRes)  ? salesRes  : (salesRes.data  || []);
+    const rems   = Array.isArray(remRes)    ? remRes    : (remRes.data    || []);
+    const future = Array.isArray(futureRes) ? futureRes : (futureRes.data || []);
+
+    // Última visita finalizada (state = 4)
+    const pastDone = appts.filter(a => a.state === 4)
+      .sort((a,b) => new Date(b.date||b.startDate) - new Date(a.date||a.startDate));
+    let lastStr = "Sin registros";
+    if (pastDone[0]) {
+      const days = Math.floor((Date.now() - new Date(pastDone[0].date||pastDone[0].startDate)) / 86400000);
+      lastStr = days === 0 ? "Hoy" : days === 1 ? "Ayer" : "Hace " + days + " días";
+    }
+
+    // Próxima cita (pendiente o sala espera)
+    const nextAppt = future.filter(a => a.state === 0 || a.state === 1)
+      .sort((a,b) => new Date(a.date||a.startDate) - new Date(b.date||b.startDate))[0];
+    const nextStr  = nextAppt ? fmtWkDate(nextAppt.date||nextAppt.startDate) : "Sin cita";
+
+    // Gasto año actual
+    const spent = sales.reduce((s, x) => s + parseFloat(x.total || x.amount || 0), 0);
+
+    // Recordatorios pendientes
+    const remN = rems.length;
+
+    panelEl.innerHTML = `
+      <div class="wk-cell"><div class="wk-label">Última visita</div><div class="wk-val">${lastStr}</div></div>
+      <div class="wk-cell"><div class="wk-label">Próxima cita</div><div class="wk-val">${nextStr}</div></div>
+      <div class="wk-cell"><div class="wk-label">Gasto ${year}</div><div class="wk-val">${spent.toFixed(2)} €</div></div>
+      <div class="wk-cell"><div class="wk-label">Recordatorios</div>
+        <div class="wk-val${remN>0?" warn":""}">${remN>0 ? remN+" pendiente"+(remN>1?"s":"") : "Al día"}</div>
+        ${remN>0 ? '<div class="wk-badge">⚠ Revisar</div>' : ""}
+      </div>`;
+    loadEl.style.display = "none";
+  } catch(e) { loadEl.textContent = "No disponible"; }
+}
+
 function goBack() {
   document.getElementById("tb-main").style.display    = "flex";
   document.getElementById("tb-profile").style.display = "none";
@@ -923,7 +1076,44 @@ function openNewClientModal() {
   renderModalPetForms(1);
   document.getElementById("fpetcount").value = "1";
   document.querySelectorAll('#modal-svc-group input').forEach(cb => cb.checked = false);
+  document.getElementById("fph-wk").value = "";
   openModal("modal-client");
+}
+
+async function searchWakyma() {
+  const rawPhone = document.getElementById("fph-wk").value.trim().replace(/\s/g,"");
+  if (rawPhone.length < 6) { showToast("Introduce el teléfono completo", true); return; }
+  const btn = document.getElementById("wk-import-btn");
+  btn.disabled = true; btn.textContent = "Buscando...";
+  try {
+    const res  = await wk("/api/v3/clients?phone=" + encodeURIComponent(rawPhone));
+    const list = Array.isArray(res) ? res : (res.data || res.clients || []);
+    if (!list.length) { showToast("No encontrado en Wakyma", true); return; }
+    const wkC = list[0];
+    document.getElementById("fn").value  = [wkC.name, wkC.surname].filter(Boolean).join(" ");
+    document.getElementById("fph").value = wkC.phone || rawPhone;
+    document.getElementById("fe").value  = wkC.email || "";
+    document.getElementById("fcp").value = wkC.cp || wkC.postalCode || "";
+    // Mascotas
+    const pRes  = await wk("/api/v3/pets?clientId=" + wkC.id);
+    const pets  = Array.isArray(pRes) ? pRes : (pRes.data || pRes.pets || []);
+    const count = Math.max(1, Math.min(pets.length || 1, 5));
+    document.getElementById("fpetcount").value = count;
+    renderModalPetForms(count);
+    pets.slice(0,5).forEach((p, i) => {
+      const q = cls => document.querySelector(`.${cls}[data-idx="${i}"]`);
+      if (q("modal-pet-name"))    q("modal-pet-name").value    = p.name  || "";
+      if (q("modal-pet-species")) q("modal-pet-species").value = wkSpecies(p.type);
+      if (q("modal-pet-breed"))   q("modal-pet-breed").value   = p.breed || "";
+      if (q("modal-pet-bday") && p.birthDate) {
+        const parts = p.birthDate.split("T")[0].split("-");
+        const bday  = parts[0].length === 2 ? [...parts].reverse().join("-") : parts.join("-");
+        q("modal-pet-bday").value = bday;
+      }
+    });
+    showToast("Importado desde Wakyma ✓");
+  } catch(e) { showToast("Error Wakyma: " + e.message, true); }
+  btn.disabled = false; btn.textContent = "🔍 Importar";
 }
 
 async function addClient() {
@@ -1057,6 +1247,9 @@ const condFields = [
   { value:"sinceMonthsGt", label:"Miembro hace más de (meses)",   num:true, min:0, ph:"ej. 6" },
   { value:"sinceMonthsLt", label:"Miembro hace menos de (meses)", num:true, min:0, ph:"ej. 3" },
   { value:"postal_code",   label:"Código postal es",              ph:"ej. 20001" },
+  { value:"wkNoVisitDays", label:"Sin visita en X días (Wakyma)",  num:true, min:1,  ph:"ej. 90",  wk:true },
+  { value:"wkSpentGt",     label:"Gasto > X€ este año (Wakyma)",   num:true, min:0,  ph:"ej. 100", wk:true },
+  { value:"wkVisitsGe",    label:"Visitas este año ≥ X (Wakyma)",  num:true, min:1,  ph:"ej. 3",   wk:true },
 ];
 
 // Crea el control de valor adecuado para el campo seleccionado
@@ -1125,27 +1318,48 @@ function matchesConditions(client, conditions) {
 let _previewTimer = null;
 function autoPreview() {
   clearTimeout(_previewTimer);
-  _previewTimer = setTimeout(runPreview, 280);
+  _previewTimer = setTimeout(() => { runPreview(); }, 280);
 }
 
-function runPreview() {
-  const conds      = getConditions();
-  previewedClients = clients.filter(c => matchesConditions(c, conds));
-  const count      = previewedClients.length;
+async function runPreview() {
+  const conds     = getConditions();
+  const wkConds   = conds.filter(c => c.field.startsWith("wk"));
+  const baseConds = conds.filter(c => !c.field.startsWith("wk"));
+
+  // Filtrado local (síncrono)
+  let candidates = clients.filter(c => matchesConditions(c, baseConds));
+
+  // Filtrado Wakyma (async, con caché)
+  if (wkConds.length) {
+    document.getElementById("prev-count").textContent = "…";
+    document.getElementById("prev-unit").textContent  = "consultando Wakyma";
+    const statsArr = await Promise.all(candidates.map(c => fetchWkStats(c.phone)));
+    candidates = candidates.filter((c, i) => {
+      const s = statsArr[i];
+      if (!s) return false;
+      return wkConds.every(cond => {
+        const v = parseFloat(cond.value);
+        switch(cond.field) {
+          case "wkNoVisitDays": return s.lastVisitDaysAgo !== null && s.lastVisitDaysAgo > v;
+          case "wkSpentGt":     return s.spentThisYear > v;
+          case "wkVisitsGe":    return s.visitsThisYear >= v;
+          default: return true;
+        }
+      });
+    });
+  }
+
+  previewedClients = candidates;
+  const count = candidates.length;
   document.getElementById("prev-count").textContent = count;
   document.getElementById("prev-unit").textContent  = count === 1 ? "miembro" : "miembros";
   document.getElementById("prev-names").innerHTML   =
-    previewedClients.slice(0,8).map(c => `<div class="preview-name">· ${c.name} (${c.pets.map(p=>p.name).join(", ")})</div>`).join("") +
-    (previewedClients.length > 8 ? `<div class="preview-name" style="color:var(--tm)">...y ${previewedClients.length-8} más</div>` : "");
+    candidates.slice(0,8).map(c => `<div class="preview-name">· ${c.name} (${c.pets.map(p=>p.name).join(", ")})</div>`).join("") +
+    (candidates.length > 8 ? `<div class="preview-name" style="color:var(--tm)">...y ${candidates.length-8} más</div>` : "");
   const lb = document.getElementById("launch-btn");
   if (lb) {
-    if (count > 0) {
-      lb.textContent      = "Lanzar campaña — " + count + " miembro" + (count > 1 ? "s" : "");
-      lb.style.background = "var(--pu)";
-    } else {
-      lb.textContent      = "Guardar campaña (sin asignar)";
-      lb.style.background = "var(--gm)";
-    }
+    lb.textContent      = count > 0 ? "Lanzar campaña — " + count + " miembro" + (count > 1 ? "s" : "") : "Guardar campaña (sin asignar)";
+    lb.style.background = count > 0 ? "var(--pu)" : "var(--gm)";
   }
 }
 
