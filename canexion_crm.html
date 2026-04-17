@@ -556,9 +556,7 @@ const WAKYMA_KEY = "0jIXmFzxFwMEy5U2BlEvj3dgGuL0pcDasLKfsmXgD-NkYEiX";
 const WAKYMA_URL = "https://api.wakyma.com";
 
 async function wk(endpoint) {
-  const r = await fetch(WAKYMA_URL + endpoint, {
-    headers: { "Authorization": "Bearer " + WAKYMA_KEY }
-  });
+  const r = await fetch("/.netlify/functions/wk-proxy?e=" + encodeURIComponent(endpoint));
   if (!r.ok) throw new Error("Wakyma HTTP " + r.status);
   return r.json();
 }
