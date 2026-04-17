@@ -92,6 +92,21 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--tp);min-h
 .pcell{background:var(--sf);border:1px solid var(--bd);border-radius:var(--rs);padding:9px 13px;}
 .pclabel{font-size:11px;color:var(--tm);margin-bottom:2px;}
 .pcval{font-size:13px;font-weight:500;color:var(--tp);}
+
+/* PET BLOCKS (perfil) */
+.pet-block{background:var(--sf);border:1px solid var(--bd);border-radius:var(--rs);padding:12px 14px;margin-bottom:7px;}
+.pet-block-title{font-family:'DM Mono',monospace;font-size:10px;font-weight:500;color:var(--gm);margin-bottom:8px;letter-spacing:.06em;text-transform:uppercase;}
+
+/* SVC TAGS */
+.svc-tags{display:flex;gap:5px;flex-wrap:wrap;}
+.svc-tag{font-size:11px;font-weight:500;padding:3px 9px;border-radius:20px;background:#e8f4ea;color:var(--gm);}
+
+/* CHECK GROUP (modal) */
+.check-group{display:flex;flex-direction:column;gap:6px;}
+.check-item{display:flex;align-items:center;gap:8px;background:var(--bg);border:1px solid var(--bd);border-radius:var(--rs);padding:9px 12px;font-size:13px;color:var(--tp);cursor:pointer;transition:border-color .15s;}
+.check-item:has(input:checked){border-color:var(--gs);background:var(--gg);}
+.check-item input[type="checkbox"]{width:16px;height:16px;accent-color:var(--gm);cursor:pointer;flex-shrink:0;}
+
 .blist{display:flex;flex-direction:column;gap:5px;}
 .bi{background:var(--sf);border:1px solid var(--bd);border-radius:var(--rs);padding:11px 13px;display:flex;align-items:flex-start;gap:10px;}
 .bi.used{opacity:.4;}
@@ -213,6 +228,10 @@ input:checked+.togslider:before{transform:translateX(16px);}
 .wa-phone{font-size:11px;color:var(--tm);font-family:'DM Mono',monospace;}
 .wa-btn{background:#25d366;border:none;border-radius:20px;padding:6px 12px;font-family:'DM Sans',sans-serif;font-size:11px;font-weight:500;color:white;cursor:pointer;white-space:nowrap;text-decoration:none;display:inline-block;}
 .camp-step-hidden{display:none;}
+
+/* PET BLOCKS (modal alta) */
+.modal-pet-block{background:var(--gg);border:1px solid var(--bd);border-radius:var(--rs);padding:12px 14px;margin-bottom:8px;}
+.modal-pet-block-title{font-family:'DM Mono',monospace;font-size:10px;font-weight:500;color:var(--gm);margin-bottom:8px;letter-spacing:.06em;text-transform:uppercase;}
 </style>
 </head>
 <body>
@@ -283,19 +302,27 @@ input:checked+.togslider:before{transform:translateX(16px);}
       <span style="font-size:18px">🎂</span>
       <span class="bdaytext">Esta semana es el cumpleaños de <strong id="pbp"></strong></span>
     </div>
+    <!-- Mascotas -->
     <div class="sec">
-      <div class="seclabel">Mascota</div>
-      <div class="pgrid">
-        <div class="pcell"><div class="pclabel">Nombre</div><div class="pcval" id="ppn"></div></div>
-        <div class="pcell"><div class="pclabel">Especie</div><div class="pcval" id="pps"></div></div>
-        <div class="pcell"><div class="pclabel">Cumpleaños</div><div class="pcval" id="ppb"></div></div>
-        <div class="pcell"><div class="pclabel">Servicios</div><div class="pcval" id="psv"></div></div>
-      </div>
+      <div class="seclabel">Mascotas</div>
+      <div id="pets-profile"></div>
     </div>
+    <!-- Servicios -->
+    <div class="sec" style="margin-top:12px;">
+      <div class="seclabel">Servicios</div>
+      <div class="svc-tags" id="psv"></div>
+    </div>
+    <!-- Código postal -->
+    <div class="sec" style="margin-top:12px;">
+      <div class="seclabel">Código postal</div>
+      <div class="pcval" id="pcp">—</div>
+    </div>
+    <!-- Beneficios -->
     <div class="sec" style="margin-top:18px;">
       <div class="seclabel">Beneficios y descuentos</div>
       <div class="blist" id="pb"></div>
     </div>
+    <!-- Notas -->
     <div class="sec" style="margin-top:18px;">
       <div class="seclabel">Notas internas</div>
       <textarea class="ntarea" id="pno" placeholder="Anotaciones sobre el cliente..."></textarea>
@@ -362,26 +389,21 @@ input:checked+.togslider:before{transform:translateX(16px);}
     <div class="fg"><label class="fl">Nombre completo *</label><input class="fi" id="fn" type="text" placeholder="Ej. Ane Etxeberria"/></div>
     <div class="fg"><label class="fl">Teléfono (WhatsApp) *</label><input class="fi" id="fph" type="tel" placeholder="6XX XXX XXX"/></div>
     <div class="fg"><label class="fl">Email (opcional)</label><input class="fi" id="fe" type="email" placeholder="email@ejemplo.com"/></div>
-    <div class="frow">
-      <div class="fg"><label class="fl">Nombre mascota *</label><input class="fi" id="fp" type="text" placeholder="Ej. Luna"/></div>
-      <div class="fg"><label class="fl">Especie *</label>
-        <select class="fsel" id="fsp">
-          <option value="">—</option>
-          <option value="Perro">Perro</option>
-          <option value="Gato">Gato</option>
-          <option value="Otro">Otro</option>
-        </select>
-      </div>
-    </div>
-    <div class="fg"><label class="fl">Fecha de nacimiento de la mascota</label><input class="fi" id="fb" type="date"/></div>
-    <div class="fg"><label class="fl">Servicios que usa *</label>
-      <select class="fsel" id="fsv">
-        <option value="clinica">Solo clínica veterinaria</option>
-        <option value="tienda">Solo tienda / pienso</option>
-        <option value="peluqueria">Solo peluquería</option>
-        <option value="clinica_tienda">Clínica + tienda</option>
-        <option value="todos">Todos los servicios</option>
+    <div class="fg"><label class="fl">Código postal</label><input class="fi" id="fcp" type="text" placeholder="Ej. 20001" maxlength="10"/></div>
+    <div class="fg">
+      <label class="fl">¿Cuántas mascotas? *</label>
+      <select class="fsel" id="fpetcount" onchange="renderModalPetForms(this.value)">
+        <option value="1">1</option><option value="2">2</option><option value="3">3</option><option value="4">4</option><option value="5">5</option>
       </select>
+    </div>
+    <div id="modal-pets-container"></div>
+    <div class="fg">
+      <label class="fl">Servicios que usa *</label>
+      <div class="check-group" id="modal-svc-group">
+        <label class="check-item"><input type="checkbox" value="clinica"/> Clínica veterinaria</label>
+        <label class="check-item"><input type="checkbox" value="tienda"/> Tienda / pienso</label>
+        <label class="check-item"><input type="checkbox" value="peluqueria"/> Peluquería</label>
+      </div>
     </div>
     <button class="subbtn" id="sbtn-client" onclick="addClient()">Dar de alta</button>
     <span class="cancelink" onclick="closeModal('modal-client')">Cancelar</span>
@@ -473,8 +495,6 @@ input:checked+.togslider:before{transform:translateX(16px);}
 
 <script>
 // ── CONFIGURACIÓN ─────────────────────────────────────────
-// Reemplaza estos dos valores con los de tu proyecto Supabase
-// Los encontrarás en: Settings → API
 const SUPABASE_URL = "https://lhvaonkibrfujdbbhkkr.supabase.co";
 const SUPABASE_KEY = "sb_publishable_wwY0Zcd-sxz5Gqr_NJ7zhg_5OkSiCU0";
 
@@ -513,10 +533,9 @@ async function sb(method, table, opts = {}) {
   return r.json();
 }
 
-// ── HELPERS ──────────────────────────────────────────────
+// ── HELPERS GENERALES ────────────────────────────────────
 function ini(n)  { return (n||"").split(" ").slice(0,2).map(w => w[0]||"").join("").toUpperCase(); }
 function avc(s)  { return s === "Gato" ? "cat" : s === "Perro" ? "dog" : "other"; }
-function svl(s)  { return {clinica:"Clínica",tienda:"Tienda",peluqueria:"Peluquería",clinica_tienda:"Clínica + Tienda",todos:"Todos"}[s] || s; }
 function fbd(d) {
   if (!d) return "—";
   const p = d.toString().split("-");
@@ -561,17 +580,56 @@ function getSinceMonths(since) {
   const now = new Date();
   return (now.getFullYear() - y) * 12 + (now.getMonth() - m);
 }
+
+// ── HELPERS MULTI-MASCOTA / MULTI-SERVICIO ───────────────
+function getSvcKey(svcArray) {
+  if (!svcArray || !svcArray.length) return "";
+  const sorted = [...svcArray].sort();
+  if (sorted.length === 3) return "todos";
+  if (sorted.length === 1) return sorted[0];
+  if (sorted.includes("clinica") && sorted.includes("tienda")) return "clinica_tienda";
+  return sorted[0];
+}
+function parseSvc(svc) {
+  if (!svc) return [];
+  if (Array.isArray(svc)) return svc;
+  if (typeof svc === "string" && svc.startsWith("[")) {
+    try { return JSON.parse(svc); } catch(e) {}
+  }
+  return [svc]; // valor legacy
+}
+function parsePets(c) {
+  // Primero intentar columna pets (nueva)
+  let arr = c.pets;
+  if (typeof arr === "string") { try { arr = JSON.parse(arr); } catch(e) { arr = null; } }
+  if (Array.isArray(arr) && arr.length > 0) return arr;
+  // Fallback a columnas legacy
+  if (c.pet) return [{ name: c.pet, species: c.species || "", breed: "", pet_bday: c.pet_bday || "" }];
+  return [];
+}
+
+// ── MAP CLIENT ───────────────────────────────────────────
 function mapClient(c) {
+  const pets     = parsePets(c);
+  const svcArray = parseSvc(c.svc);
+  const birthdayPets = pets.filter(p => checkBirthdayWeek(p.pet_bday)).map(p => p.name);
   return {
     ...c,
     id:           c.id.toString(),
     phone:        (c.phone || "").toString(),
+    postal_code:  c.postal_code || "",
+    pets:         pets,
+    svcArray:     svcArray,
     benefits:     Array.isArray(c.benefits) ? c.benefits : [],
-    birthdayWeek: checkBirthdayWeek(c.pet_bday),
-    petAge:       getPetAge(c.pet_bday)
+    birthdayWeek: birthdayPets.length > 0,
+    birthdayPets: birthdayPets,
+    petAge:       pets.length > 0 ? getPetAge(pets[0].pet_bday) : null
   };
 }
-function buildClientBenefits(svc) {
+
+// ── BUILD BENEFITS ───────────────────────────────────────
+function buildClientBenefits(svcArray) {
+  const svcKey  = getSvcKey(Array.isArray(svcArray) ? svcArray : [svcArray]);
   const benefits = [...benefitTemplates]
     .filter(t => t.show_in_welcome)
     .sort((a, b) => a.order_index - b.order_index)
@@ -582,10 +640,10 @@ function buildClientBenefits(svc) {
       status: t.dot_type === "always" ? "always" : "active",
       dot:    t.dot_type === "always" ? "always" : "active"
     }));
-  const coupon = discoveryCoupons.find(c => c.svc === svc);
+  const coupon = discoveryCoupons.find(c => c.svc === svcKey);
   if (coupon && coupon.active && coupon.name) {
     benefits.splice(2, 0, {
-      id:       "disc_" + svc,
+      id:       "disc_" + svcKey,
       name:     coupon.name,
       desc:     coupon.description,
       discount: coupon.discount,
@@ -595,6 +653,7 @@ function buildClientBenefits(svc) {
   }
   return benefits;
 }
+
 function showToast(msg, isErr = false) {
   const t = document.getElementById("toast");
   t.textContent = msg;
@@ -670,13 +729,15 @@ function renderList(list) {
     return;
   }
   el.innerHTML = list.map(c => {
+    const firstSpecies = c.pets.length ? c.pets[0].species : "";
+    const petNames     = c.pets.map(p => p.name).join(", ") || "—";
     const active   = (c.benefits||[]).filter(b => b.status === "active" && b.dot !== "campaign").length;
     const campaign = (c.benefits||[]).filter(b => b.dot === "campaign"  && b.status === "active").length;
     return `<div class="cc" onclick="openProfile('${c.id}')">
-      <div class="av ${avc(c.species)}">${ini(c.name)}</div>
+      <div class="av ${avc(firstSpecies)}">${ini(c.name)}</div>
       <div class="ci">
         <div class="cn">${c.name}</div>
-        <div class="cs">${c.pet} · ${c.species} · ${c.phone}</div>
+        <div class="cs">${petNames} · ${c.phone}</div>
         <div class="cbs">
           ${active   > 0 ? `<span class="badge active">${active} activo${active > 1 ? "s" : ""}</span>` : ""}
           ${campaign > 0 ? `<span class="badge campaign">${campaign} campaña${campaign > 1 ? "s" : ""}</span>` : ""}
@@ -686,12 +747,13 @@ function renderList(list) {
     </div>`;
   }).join("");
 }
+
 function filterClients(q) {
   const v = q.toLowerCase().trim();
   filtered = !v ? [...clients] : clients.filter(c =>
     c.name.toLowerCase().includes(v) ||
     (c.phone||"").toString().replace(/\s/g,"").includes(v.replace(/\s/g,"")) ||
-    (c.pet||"").toLowerCase().includes(v)
+    c.pets.some(p => (p.name||"").toLowerCase().includes(v))
   );
   renderList(filtered);
 }
@@ -701,20 +763,48 @@ function openProfile(id) {
   current = clients.find(c => c.id === id);
   if (!current) return;
   const c = current;
+  const firstSpecies = c.pets.length ? c.pets[0].species : "";
+
   document.getElementById("pav").textContent = ini(c.name);
-  document.getElementById("pav").className   = "avlg " + avc(c.species);
+  document.getElementById("pav").className   = "avlg " + avc(firstSpecies);
   document.getElementById("pn").textContent  = c.name;
   document.getElementById("pph").textContent = c.phone;
   document.getElementById("psi").textContent = "Miembro desde " + c.since;
-  document.getElementById("ppn").textContent = c.pet;
-  document.getElementById("pps").textContent = c.species;
-  document.getElementById("ppb").textContent = fbd(c.pet_bday);
-  document.getElementById("psv").textContent = svl(c.svc);
-  document.getElementById("pno").value       = c.notes || "";
+
+  // Mascotas
+  const svcMap = {clinica:"Clínica",tienda:"Tienda",peluqueria:"Peluquería"};
+  document.getElementById("pets-profile").innerHTML = c.pets.map(p => `
+    <div class="pet-block">
+      <div class="pet-block-title">${p.name}</div>
+      <div class="pgrid">
+        <div class="pcell"><div class="pclabel">Especie</div><div class="pcval">${p.species || "—"}</div></div>
+        <div class="pcell"><div class="pclabel">Raza</div><div class="pcval">${p.breed || "—"}</div></div>
+        <div class="pcell"><div class="pclabel">Cumpleaños</div><div class="pcval">${fbd(p.pet_bday)}</div></div>
+      </div>
+    </div>
+  `).join("") || '<div style="font-size:13px;color:var(--tm);">Sin mascotas registradas</div>';
+
+  // Servicios como tags
+  document.getElementById("psv").innerHTML = c.svcArray.length
+    ? c.svcArray.map(s => `<span class="svc-tag">${svcMap[s] || s}</span>`).join("")
+    : '<span style="font-size:13px;color:var(--tm);">—</span>';
+
+  // Código postal
+  document.getElementById("pcp").textContent = c.postal_code || "—";
+
+  document.getElementById("pno").value = c.notes || "";
+
+  // Alerta cumpleaños (cualquier mascota)
   const ba = document.getElementById("pba");
-  if (c.birthdayWeek) { ba.style.display = "flex"; document.getElementById("pbp").textContent = c.pet; }
-  else ba.style.display = "none";
+  if (c.birthdayWeek) {
+    ba.style.display = "flex";
+    document.getElementById("pbp").textContent = c.birthdayPets.join(", ");
+  } else {
+    ba.style.display = "none";
+  }
+
   renderBenefitsProfile(c);
+
   document.getElementById("tb-main").style.display    = "none";
   document.getElementById("tb-profile").style.display = "flex";
   document.getElementById("main-nav").style.display   = "none";
@@ -723,6 +813,7 @@ function openProfile(id) {
   document.getElementById("sp").classList.add("active");
   window.scrollTo(0, 0);
 }
+
 function renderBenefitsProfile(c) {
   document.getElementById("pb").innerHTML = (c.benefits||[]).map((b, i) => {
     const expTag = b.expiry ? `<div class="bexpiry">Hasta ${b.expiry}</div>` : "";
@@ -741,6 +832,7 @@ function renderBenefitsProfile(c) {
     </div>`;
   }).join("");
 }
+
 async function canjear(i) {
   current.benefits[i].status = "used";
   current.benefits[i].dot    = "used";
@@ -753,6 +845,7 @@ async function canjear(i) {
     showToast("Beneficio canjeado ✓");
   } catch(e) { showToast("Error al guardar", true); }
 }
+
 async function saveNote() {
   const notes = document.getElementById("pno").value;
   current.notes = notes;
@@ -761,6 +854,7 @@ async function saveNote() {
     showToast("Nota guardada ✓");
   } catch(e) { showToast("Error al guardar", true); }
 }
+
 function goBack() {
   document.getElementById("tb-main").style.display    = "flex";
   document.getElementById("tb-profile").style.display = "none";
@@ -770,25 +864,83 @@ function goBack() {
 }
 
 // ── ALTA MANUAL DE CLIENTE ────────────────────────────────
-function openNewClientModal() { openModal("modal-client"); }
+function renderModalPetForms(n) {
+  n = parseInt(n) || 1;
+  const container = document.getElementById("modal-pets-container");
+  container.innerHTML = "";
+  for (let i = 0; i < n; i++) {
+    const block = document.createElement("div");
+    block.className = "modal-pet-block";
+    block.innerHTML = `
+      <div class="modal-pet-block-title">Mascota ${i + 1}</div>
+      <div class="frow">
+        <div class="fg"><label class="fl">Nombre *</label><input class="fi modal-pet-name" data-idx="${i}" type="text" placeholder="Ej. Luna"/></div>
+        <div class="fg"><label class="fl">Especie *</label>
+          <select class="fsel modal-pet-species" data-idx="${i}">
+            <option value="">—</option>
+            <option value="Perro">Perro</option>
+            <option value="Gato">Gato</option>
+            <option value="Otro">Otro</option>
+          </select>
+        </div>
+      </div>
+      <div class="frow">
+        <div class="fg"><label class="fl">Raza</label><input class="fi modal-pet-breed" data-idx="${i}" type="text" placeholder="Ej. Labrador"/></div>
+        <div class="fg"><label class="fl">Fecha nacimiento</label><input class="fi modal-pet-bday" data-idx="${i}" type="date"/></div>
+      </div>`;
+    container.appendChild(block);
+  }
+}
+
+function openNewClientModal() {
+  renderModalPetForms(1);
+  document.getElementById("fpetcount").value = "1";
+  document.querySelectorAll('#modal-svc-group input').forEach(cb => cb.checked = false);
+  openModal("modal-client");
+}
+
 async function addClient() {
-  const name    = document.getElementById("fn").value.trim();
-  const phone   = document.getElementById("fph").value.trim().replace(/\s/g, "");
-  const pet     = document.getElementById("fp").value.trim();
-  const species = document.getElementById("fsp").value;
-  const svc     = document.getElementById("fsv").value;
-  if (!name || !phone || !pet || !species) { showToast("Rellena los campos obligatorios", true); return; }
+  const name  = document.getElementById("fn").value.trim();
+  const phone = document.getElementById("fph").value.trim().replace(/\s/g, "");
+  if (!name || !phone) { showToast("Rellena nombre y teléfono", true); return; }
+
+  // Recoger mascotas
+  const petCount = parseInt(document.getElementById("fpetcount").value) || 1;
+  const pets = [];
+  for (let i = 0; i < petCount; i++) {
+    const pName = document.querySelector(`.modal-pet-name[data-idx="${i}"]`)?.value.trim();
+    const pSpec = document.querySelector(`.modal-pet-species[data-idx="${i}"]`)?.value;
+    if (!pName || !pSpec) { showToast("Rellena nombre y especie de cada mascota", true); return; }
+    pets.push({
+      name:     pName,
+      species:  pSpec,
+      breed:    document.querySelector(`.modal-pet-breed[data-idx="${i}"]`)?.value.trim() || "",
+      pet_bday: document.querySelector(`.modal-pet-bday[data-idx="${i}"]`)?.value || ""
+    });
+  }
+
+  // Recoger servicios
+  const svcArray = Array.from(document.querySelectorAll('#modal-svc-group input:checked')).map(cb => cb.value);
+  if (!svcArray.length) { showToast("Selecciona al menos un servicio", true); return; }
+
   const btn = document.getElementById("sbtn-client");
   btn.disabled = true; btn.textContent = "Guardando...";
   try {
     const existing = await sb("GET", "clients", { filter: "phone=eq." + encodeURIComponent(phone) });
-    if (existing && existing.length > 0) { showToast("Este teléfono ya está registrado", true); btn.disabled = false; btn.textContent = "Dar de alta"; return; }
-    const benefits = buildClientBenefits(svc);
+    if (existing && existing.length > 0) {
+      showToast("Este teléfono ya está registrado", true);
+      btn.disabled = false; btn.textContent = "Dar de alta"; return;
+    }
+    const benefits = buildClientBenefits(svcArray);
     const result   = await sb("POST", "clients", { body: {
       name, phone, since: formatSince(),
-      email:    document.getElementById("fe").value.trim(),
-      pet, species, svc,
-      pet_bday: document.getElementById("fb").value || null,
+      email:       document.getElementById("fe").value.trim(),
+      postal_code: document.getElementById("fcp").value.trim(),
+      pets:        pets,
+      pet:         pets[0].name,
+      species:     pets[0].species,
+      pet_bday:    pets[0].pet_bday || null,
+      svc:         JSON.stringify(svcArray),
       notes: "", benefits
     }});
     const mapped = mapClient(result[0]);
@@ -797,8 +949,11 @@ async function addClient() {
     renderList(filtered);
     closeModal("modal-client");
     showToast(name + " añadido/a ✓");
-    ["fn","fph","fe","fp","fb"].forEach(id => document.getElementById(id).value = "");
-    document.getElementById("fsp").value = "";
+    // Reset
+    ["fn","fph","fe","fcp"].forEach(id => document.getElementById(id).value = "");
+    document.getElementById("fpetcount").value = "1";
+    renderModalPetForms(1);
+    document.querySelectorAll('#modal-svc-group input').forEach(cb => cb.checked = false);
   } catch(e) { showToast("Error: " + e.message, true); }
   btn.disabled = false; btn.textContent = "Dar de alta";
 }
@@ -823,18 +978,20 @@ function renderCampaigns() {
     </div>`;
   }).join("");
 }
+
 function openCampModal() {
   campCoupon = null; previewedClients = [];
   ["cname","cdesc","cdisc","cexp"].forEach(id => document.getElementById(id).value = "");
   document.getElementById("cond-list").innerHTML        = "";
   document.getElementById("preview-box").style.display  = "none";
-  document.getElementById("launch-btn").textContent    = "Guardar campaña";
+  document.getElementById("launch-btn").textContent     = "Guardar campaña";
   document.getElementById("launch-btn").style.background = "var(--gm)";
-  document.getElementById("wa-section").style.display  = "none";
-  document.getElementById("camp-step1").style.display  = "block";
+  document.getElementById("wa-section").style.display   = "none";
+  document.getElementById("camp-step1").style.display   = "block";
   document.getElementById("camp-step2").classList.add("camp-step-hidden");
   openModal("modal-camp");
 }
+
 function goToCampStep2() {
   const name = document.getElementById("cname").value.trim();
   const desc = document.getElementById("cdesc").value.trim();
@@ -845,15 +1002,17 @@ function goToCampStep2() {
   document.getElementById("camp-step2").classList.remove("camp-step-hidden");
   document.getElementById("camp-step2").style.display = "block";
 }
+
 const condFields = [
   { value:"species",       label:"Especie es",                   options:[{v:"Perro",l:"Perro"},{v:"Gato",l:"Gato"},{v:"Otro",l:"Otro"}] },
-  { value:"svc",           label:"Servicio que usa",             options:[{v:"clinica",l:"Clínica"},{v:"tienda",l:"Tienda"},{v:"peluqueria",l:"Peluquería"},{v:"clinica_tienda",l:"Clínica+Tienda"},{v:"todos",l:"Todos"}] },
+  { value:"svc",           label:"Servicio que usa",             options:[{v:"clinica",l:"Clínica"},{v:"tienda",l:"Tienda"},{v:"peluqueria",l:"Peluquería"}] },
   { value:"petAgeGt",      label:"Edad mascota > (años)" },
   { value:"petAgeLt",      label:"Edad mascota < (años)" },
   { value:"birthdayDays",  label:"Cumpleaños en próximos X días" },
   { value:"sinceMonthsGt", label:"Miembro hace > (meses)" },
   { value:"sinceMonthsLt", label:"Miembro hace < (meses)" },
 ];
+
 function addCondition() {
   const list = document.getElementById("cond-list");
   const idx  = list.children.length;
@@ -861,30 +1020,33 @@ function addCondition() {
   div.className = "cond-row"; div.id = "cond-"+idx;
   div.innerHTML = `
     <select>${condFields.map(f => `<option value="${f.value}">${f.label}</option>`).join("")}</select>
-    <input id="cond-val-${idx}" type="text" placeholder="valor" style="width:80px;background:var(--sf);border:1px solid var(--bd);border-radius:var(--rs);padding:4px 8px;font-family:'DM Mono',monospace;font-size:13px;color:var(--tp);outline:none;"/>
+    <input id="cond-val-${idx}" type="text" placeholder="valor"/>
     <button class="cond-del" onclick="this.parentNode.remove()">✕</button>`;
   list.appendChild(div);
 }
+
 function getConditions() {
   return Array.from(document.getElementById("cond-list").children).map(row => ({
     field: row.querySelector("select").value,
     value: row.querySelector("input").value.trim()
   })).filter(c => c.value);
 }
+
 function matchesConditions(client, conditions) {
   return conditions.every(cond => {
     switch(cond.field) {
-      case "species":       return client.species === cond.value;
-      case "svc":           return client.svc === cond.value;
-      case "petAgeGt":      return (client.petAge||0) > parseFloat(cond.value);
-      case "petAgeLt":      return (client.petAge||0) < parseFloat(cond.value);
-      case "birthdayDays":  return checkBirthdayDays(client.pet_bday, parseInt(cond.value));
+      case "species":       return client.pets.some(p => p.species === cond.value);
+      case "svc":           return client.svcArray.includes(cond.value);
+      case "petAgeGt":      return client.pets.some(p => (getPetAge(p.pet_bday)||0) > parseFloat(cond.value));
+      case "petAgeLt":      return client.pets.some(p => (getPetAge(p.pet_bday)||0) < parseFloat(cond.value));
+      case "birthdayDays":  return client.pets.some(p => checkBirthdayDays(p.pet_bday, parseInt(cond.value)));
       case "sinceMonthsGt": return getSinceMonths(client.since) > parseInt(cond.value);
       case "sinceMonthsLt": return getSinceMonths(client.since) < parseInt(cond.value);
       default: return true;
     }
   });
 }
+
 function previewCampaign() {
   const conds      = getConditions();
   previewedClients = clients.filter(c => matchesConditions(c, conds));
@@ -892,18 +1054,19 @@ function previewCampaign() {
   document.getElementById("prev-count").textContent = count;
   document.getElementById("prev-sub").textContent   = count === 1 ? "miembro recibirá este cupón" : "miembros recibirán este cupón";
   document.getElementById("prev-names").innerHTML   =
-    previewedClients.slice(0,10).map(c => `<div class="preview-name">· ${c.name} (${c.pet})</div>`).join("") +
+    previewedClients.slice(0,10).map(c => `<div class="preview-name">· ${c.name} (${c.pets.map(p=>p.name).join(", ")})</div>`).join("") +
     (previewedClients.length > 10 ? `<div class="preview-name" style="color:var(--tm)">...y ${previewedClients.length-10} más</div>` : "");
   document.getElementById("preview-box").style.display = "block";
   const lb = document.getElementById("launch-btn");
   if (count > 0) {
-    lb.textContent        = "Lanzar campaña — " + count + " miembro" + (count > 1 ? "s" : "");
-    lb.style.background   = "var(--pu)";
+    lb.textContent      = "Lanzar campaña — " + count + " miembro" + (count > 1 ? "s" : "");
+    lb.style.background = "var(--pu)";
   } else {
-    lb.textContent        = "Guardar campaña (sin asignar)";
-    lb.style.background   = "var(--gm)";
+    lb.textContent      = "Guardar campaña (sin asignar)";
+    lb.style.background = "var(--gm)";
   }
 }
+
 async function launchCampaign() {
   const btn = document.getElementById("launch-btn");
   btn.disabled = true; btn.textContent = "Lanzando...";
@@ -936,6 +1099,7 @@ async function launchCampaign() {
   } catch(e) { showToast("Error: " + e.message, true); }
   btn.disabled = false; btn.textContent = "Lanzar campaña";
 }
+
 function showWaList(list, coupon) {
   document.getElementById("wa-section").style.display = "block";
   const base = "Hola [NOMBRE] 👋\n\nTienes un nuevo beneficio en Familia Canexion:\n\n🎁 *"+coupon.name+"*\n"+coupon.desc+
@@ -973,6 +1137,7 @@ function renderBenefitTemplates() {
     </div>
   `).join("");
 }
+
 async function toggleWelcome(id, current) {
   const newVal = !current;
   try {
@@ -983,6 +1148,7 @@ async function toggleWelcome(id, current) {
     showToast(newVal ? "Visible en bienvenida ✓" : "Ocultado de bienvenida ✓");
   } catch(e) { showToast("Error al actualizar", true); }
 }
+
 function openBenModal(id) {
   editingBenId = id;
   const t = id ? benefitTemplates.find(t => t.id === id) : null;
@@ -996,6 +1162,7 @@ function openBenModal(id) {
   document.getElementById("sbtn-ben").textContent = "Guardar beneficio";
   openModal("modal-ben");
 }
+
 async function saveBen() {
   const name           = document.getElementById("ben-name").value.trim();
   const description    = document.getElementById("ben-desc").value.trim();
@@ -1021,6 +1188,7 @@ async function saveBen() {
   } catch(e) { showToast("Error: " + e.message, true); }
   btn.disabled = false; btn.textContent = "Guardar beneficio";
 }
+
 async function deleteBen(id) {
   if (!confirm("¿Eliminar este beneficio?")) return;
   try {
@@ -1039,6 +1207,7 @@ const svcList = [
   { value: "clinica_tienda", label: "Clínica + tienda"    },
   { value: "todos",          label: "Todos los servicios" }
 ];
+
 function renderDiscoveryCoupons() {
   const el = document.getElementById("disc-list");
   el.innerHTML = svcList.map(s => {
@@ -1057,6 +1226,7 @@ function renderDiscoveryCoupons() {
     </div>`;
   }).join("");
 }
+
 function openDiscModal(svc) {
   editingDiscSvc = svc;
   const s      = svcList.find(s => s.value === svc);
@@ -1070,6 +1240,7 @@ function openDiscModal(svc) {
   document.getElementById("sbtn-disc").textContent = "Guardar cupón";
   openModal("modal-disc");
 }
+
 async function saveDisc() {
   const name        = document.getElementById("disc-name").value.trim();
   const description = document.getElementById("disc-desc").value.trim();

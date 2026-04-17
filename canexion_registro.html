@@ -33,6 +33,16 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--tp);min-h
 .fsel:focus{border-color:var(--gs);}
 .hint{font-size:12px;color:var(--tm);margin-top:4px;}
 
+/* MASCOTAS DINÁMICAS */
+.pet-block{background:var(--gg);border:1px solid var(--bd);border-radius:var(--rs);padding:14px 16px;margin-bottom:12px;}
+.pet-block-title{font-family:'DM Mono',monospace;font-size:11px;font-weight:500;color:var(--gm);margin-bottom:10px;letter-spacing:.08em;text-transform:uppercase;}
+
+/* CHECKBOXES SERVICIO */
+.check-group{display:flex;flex-direction:column;gap:8px;}
+.check-item{display:flex;align-items:center;gap:10px;background:var(--bg);border:1px solid var(--bd);border-radius:var(--rs);padding:11px 14px;font-size:14px;color:var(--tp);cursor:pointer;transition:border-color .15s;}
+.check-item:has(input:checked){border-color:var(--gs);background:var(--gg);}
+.check-item input[type="checkbox"]{width:18px;height:18px;accent-color:var(--gm);cursor:pointer;flex-shrink:0;}
+
 /* BENEFICIOS PREVIEW */
 .benefits-preview{margin-top:20px;background:var(--gg);border:1px solid var(--bd);border-radius:var(--rs);padding:14px 16px;}
 .bp-title{font-size:12px;font-weight:500;color:var(--gm);margin-bottom:10px;}
@@ -114,41 +124,34 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--tp);min-h
         <label class="fl">Email (opcional)</label>
         <input class="fi" id="fe" type="email" placeholder="tu@email.com" autocomplete="email"/>
       </div>
-
-      <div class="form-section-title">Tu mascota</div>
-      <div class="frow">
-        <div class="fg">
-          <label class="fl">Nombre *</label>
-          <input class="fi" id="fp" type="text" placeholder="Ej. Luna"/>
-          <div class="field-error" id="err-fp">Introduce el nombre</div>
-        </div>
-        <div class="fg">
-          <label class="fl">Especie *</label>
-          <select class="fsel" id="fsp">
-            <option value="">Seleccionar</option>
-            <option value="Perro">Perro</option>
-            <option value="Gato">Gato</option>
-            <option value="Otro">Otro</option>
-          </select>
-          <div class="field-error" id="err-fsp">Selecciona la especie</div>
-        </div>
-      </div>
       <div class="fg">
-        <label class="fl">Fecha de nacimiento de tu mascota</label>
-        <input class="fi" id="fb" type="date"/>
-        <div class="hint">La usamos para sorprenderte en su cumpleaños 🎂</div>
+        <label class="fl">Código postal *</label>
+        <input class="fi" id="fcp" type="text" placeholder="Ej. 20001" maxlength="10" autocomplete="postal-code"/>
+        <div class="field-error" id="err-fcp">Introduce tu código postal</div>
       </div>
+
+      <div class="form-section-title">Tus mascotas</div>
+      <div class="fg">
+        <label class="fl">¿Cuántas mascotas tienes? *</label>
+        <select class="fsel" id="fpetcount" onchange="renderPetForms(this.value)">
+          <option value="1">1</option>
+          <option value="2">2</option>
+          <option value="3">3</option>
+          <option value="4">4</option>
+          <option value="5">5</option>
+        </select>
+      </div>
+      <div id="pets-container"></div>
+
+      <div class="form-section-title">Servicios</div>
       <div class="fg">
         <label class="fl">¿Qué servicios usas en Canexion? *</label>
-        <select class="fsel" id="fsv" onchange="updateBenefitsPreview()">
-          <option value="">Seleccionar</option>
-          <option value="clinica">Clínica veterinaria</option>
-          <option value="tienda">Tienda / pienso</option>
-          <option value="peluqueria">Peluquería</option>
-          <option value="clinica_tienda">Clínica + tienda</option>
-          <option value="todos">Todos los servicios</option>
-        </select>
-        <div class="field-error" id="err-fsv">Selecciona una opción</div>
+        <div class="check-group">
+          <label class="check-item"><input type="checkbox" value="clinica" onchange="updateBenefitsPreview()"/> Clínica veterinaria</label>
+          <label class="check-item"><input type="checkbox" value="tienda" onchange="updateBenefitsPreview()"/> Tienda / pienso</label>
+          <label class="check-item"><input type="checkbox" value="peluqueria" onchange="updateBenefitsPreview()"/> Peluquería</label>
+        </div>
+        <div class="field-error" id="err-fsv">Selecciona al menos un servicio</div>
       </div>
 
       <!-- PREVIEW DE BENEFICIOS (dinámico) -->
@@ -195,15 +198,59 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--tp);min-h
 
 <script>
 // ── CONFIGURACIÓN ─────────────────────────────────────────
-// Mismos valores que en el CRM
 const SUPABASE_URL = "https://lhvaonkibrfujdbbhkkr.supabase.co";
 const SUPABASE_KEY = "sb_publishable_wwY0Zcd-sxz5Gqr_NJ7zhg_5OkSiCU0";
 
 let benefitTemplates = [];
 let discoveryCoupons = [];
 
+// ── MASCOTAS DINÁMICAS ────────────────────────────────────
+function renderPetForms(n) {
+  n = parseInt(n) || 1;
+  const container = document.getElementById("pets-container");
+  container.innerHTML = "";
+  for (let i = 0; i < n; i++) {
+    const block = document.createElement("div");
+    block.className = "pet-block";
+    block.innerHTML = `
+      <div class="pet-block-title">Mascota ${i + 1}</div>
+      <div class="frow">
+        <div class="fg">
+          <label class="fl">Nombre *</label>
+          <input class="fi pet-name" data-idx="${i}" type="text" placeholder="Ej. Luna"/>
+          <div class="field-error pet-name-err" data-idx="${i}">Introduce el nombre</div>
+        </div>
+        <div class="fg">
+          <label class="fl">Especie *</label>
+          <select class="fsel pet-species" data-idx="${i}">
+            <option value="">Seleccionar</option>
+            <option value="Perro">Perro</option>
+            <option value="Gato">Gato</option>
+            <option value="Otro">Otro</option>
+          </select>
+          <div class="field-error pet-species-err" data-idx="${i}">Selecciona la especie</div>
+        </div>
+      </div>
+      <div class="frow">
+        <div class="fg">
+          <label class="fl">Raza</label>
+          <input class="fi pet-breed" data-idx="${i}" type="text" placeholder="Ej. Labrador"/>
+        </div>
+        <div class="fg">
+          <label class="fl">Fecha de nacimiento</label>
+          <input class="fi pet-bday" data-idx="${i}" type="date"/>
+          <div class="hint">Para el cumpleaños 🎂</div>
+        </div>
+      </div>`;
+    container.appendChild(block);
+  }
+}
+
 // ── INICIALIZACIÓN ────────────────────────────────────────
-window.addEventListener("DOMContentLoaded", loadBenefits);
+window.addEventListener("DOMContentLoaded", () => {
+  renderPetForms(1);
+  loadBenefits();
+});
 
 async function loadBenefits() {
   try {
@@ -216,7 +263,6 @@ async function loadBenefits() {
     discoveryCoupons = await dRes.json();
     updateBenefitsPreview();
   } catch(e) {
-    // Si falla la carga, mostrar lista por defecto
     document.getElementById("bp-list").innerHTML = `
       <div class="bp-item"><div class="bp-dot"></div><div class="bp-text">Regalo de bienvenida en tienda</div></div>
       <div class="bp-item"><div class="bp-dot"></div><div class="bp-text">15% de descuento en tu primera compra</div></div>
@@ -227,23 +273,31 @@ async function loadBenefits() {
   }
 }
 
-// Actualiza la preview cuando cambia el servicio
-function updateBenefitsPreview() {
-  const svc = document.getElementById("fsv").value;
-  const list = [...benefitTemplates].sort((a, b) => a.order_index - b.order_index);
+// ── CLAVE DE SERVICIO ─────────────────────────────────────
+// Convierte array de servicios seleccionados a clave para cupón de descubrimiento
+function getSvcKey(svcArray) {
+  if (!svcArray || !svcArray.length) return "";
+  const sorted = [...svcArray].sort();
+  if (sorted.length === 3) return "todos";
+  if (sorted.length === 1) return sorted[0];
+  if (sorted.includes("clinica") && sorted.includes("tienda")) return "clinica_tienda";
+  return sorted[0];
+}
 
-  // Insertar cupón de descubrimiento si aplica
-  const coupon = discoveryCoupons.find(c => c.svc === svc);
+// ── PREVIEW DE BENEFICIOS ─────────────────────────────────
+function updateBenefitsPreview() {
+  const checked = Array.from(document.querySelectorAll('.check-group input:checked')).map(cb => cb.value);
+  const svcKey  = getSvcKey(checked);
+  const list    = [...benefitTemplates].sort((a, b) => a.order_index - b.order_index);
+  const coupon  = svcKey ? discoveryCoupons.find(c => c.svc === svcKey) : null;
   const preview = list.map(t => ({ name: t.name, dotType: t.dot_type }));
-  if (svc && coupon && coupon.active && coupon.name) {
+  if (svcKey && coupon && coupon.active && coupon.name) {
     preview.splice(2, 0, { name: coupon.name, dotType: "active" });
   }
-
   if (!preview.length) {
     document.getElementById("bp-list").innerHTML = '<div class="bp-loading">Selecciona un servicio para ver tus beneficios</div>';
     return;
   }
-
   document.getElementById("bp-list").innerHTML = preview.map(b => `
     <div class="bp-item">
       <div class="bp-dot ${b.dotType === 'always' ? 'gold' : ''}"></div>
@@ -255,25 +309,49 @@ function updateBenefitsPreview() {
 // ── VALIDACIÓN ────────────────────────────────────────────
 function validate() {
   let ok = true;
-  const fields = [
-    { id:"fn",  err:"err-fn"  },
-    { id:"fph", err:"err-fph" },
-    { id:"fp",  err:"err-fp"  },
-    { id:"fsp", err:"err-fsp" },
-    { id:"fsv", err:"err-fsv" },
-  ];
-  fields.forEach(f => {
+
+  // Datos personales obligatorios
+  [{ id:"fn", err:"err-fn" }, { id:"fph", err:"err-fph" }, { id:"fcp", err:"err-fcp" }].forEach(f => {
     const el  = document.getElementById(f.id);
     const err = document.getElementById(f.err);
     if (!el.value.trim()) {
-      el.classList.add("error");
-      err.style.display = "block";
-      ok = false;
+      el.classList.add("error"); err.style.display = "block"; ok = false;
     } else {
-      el.classList.remove("error");
-      err.style.display = "none";
+      el.classList.remove("error"); err.style.display = "none";
     }
   });
+
+  // Validar cada mascota
+  const petCount = parseInt(document.getElementById("fpetcount").value) || 1;
+  for (let i = 0; i < petCount; i++) {
+    const nameEl  = document.querySelector(`.pet-name[data-idx="${i}"]`);
+    const nameErr = document.querySelector(`.pet-name-err[data-idx="${i}"]`);
+    if (nameEl && !nameEl.value.trim()) {
+      nameEl.classList.add("error");
+      if (nameErr) nameErr.style.display = "block";
+      ok = false;
+    } else if (nameEl) {
+      nameEl.classList.remove("error");
+      if (nameErr) nameErr.style.display = "none";
+    }
+    const specEl  = document.querySelector(`.pet-species[data-idx="${i}"]`);
+    const specErr = document.querySelector(`.pet-species-err[data-idx="${i}"]`);
+    if (specEl && !specEl.value) {
+      specEl.classList.add("error");
+      if (specErr) specErr.style.display = "block";
+      ok = false;
+    } else if (specEl) {
+      specEl.classList.remove("error");
+      if (specErr) specErr.style.display = "none";
+    }
+  }
+
+  // Al menos un servicio
+  const svcChecked = document.querySelectorAll('.check-group input:checked').length;
+  const svcErr     = document.getElementById("err-fsv");
+  if (!svcChecked) { svcErr.style.display = "block"; ok = false; }
+  else             { svcErr.style.display = "none"; }
+
   return ok;
 }
 
@@ -281,16 +359,29 @@ function validate() {
 async function submitForm() {
   if (!validate()) return;
   const btn = document.getElementById("sbtn");
-  btn.disabled = true;
+  btn.disabled    = true;
   btn.textContent = "Registrando...";
 
-  const name    = document.getElementById("fn").value.trim();
-  const phone   = document.getElementById("fph").value.trim().replace(/\s/g, "");
-  const email   = document.getElementById("fe").value.trim();
-  const pet     = document.getElementById("fp").value.trim();
-  const species = document.getElementById("fsp").value;
-  const petBday = document.getElementById("fb").value;
-  const svc     = document.getElementById("fsv").value;
+  const name       = document.getElementById("fn").value.trim();
+  const phone      = document.getElementById("fph").value.trim().replace(/\s/g, "");
+  const email      = document.getElementById("fe").value.trim();
+  const postalCode = document.getElementById("fcp").value.trim();
+
+  // Recoger mascotas
+  const petCount = parseInt(document.getElementById("fpetcount").value) || 1;
+  const pets = [];
+  for (let i = 0; i < petCount; i++) {
+    pets.push({
+      name:     document.querySelector(`.pet-name[data-idx="${i}"]`).value.trim(),
+      species:  document.querySelector(`.pet-species[data-idx="${i}"]`).value,
+      breed:    document.querySelector(`.pet-breed[data-idx="${i}"]`)?.value.trim() || "",
+      pet_bday: document.querySelector(`.pet-bday[data-idx="${i}"]`)?.value || ""
+    });
+  }
+
+  // Recoger servicios
+  const svcArray = Array.from(document.querySelectorAll('.check-group input:checked')).map(cb => cb.value);
+  const svcKey   = getSvcKey(svcArray);
 
   const headers = {
     "apikey":        SUPABASE_KEY,
@@ -300,17 +391,17 @@ async function submitForm() {
 
   try {
     // Comprobar duplicado por teléfono
-    const dupRes = await fetch(SUPABASE_URL + "/rest/v1/clients?phone=eq." + encodeURIComponent(phone), { headers });
+    const dupRes  = await fetch(SUPABASE_URL + "/rest/v1/clients?phone=eq." + encodeURIComponent(phone), { headers });
     const dupData = await dupRes.json();
     if (dupData && dupData.length > 0) {
-      btn.disabled = false;
+      btn.disabled    = false;
       btn.textContent = "Unirme a Familia Canexion";
       alert("Este teléfono ya está registrado en Familia Canexion.\n\nSi tienes dudas escríbenos por WhatsApp al 943 04 87 83.");
       return;
     }
 
     // Construir beneficios
-    const benefits = buildBenefits(svc);
+    const benefits = buildBenefits(svcKey);
 
     // Registrar cliente
     const res = await fetch(SUPABASE_URL + "/rest/v1/clients", {
@@ -318,27 +409,31 @@ async function submitForm() {
       headers: { ...headers, "Prefer": "return=representation" },
       body: JSON.stringify({
         name, phone, email,
-        since:    formatSince(),
-        pet, species, svc,
-        pet_bday: petBday || null,
-        notes:    "",
+        since:       formatSince(),
+        postal_code: postalCode,
+        pets:        pets,
+        // Columnas legacy para retrocompatibilidad con clientes existentes
+        pet:         pets[0].name,
+        species:     pets[0].species,
+        pet_bday:    pets[0].pet_bday || null,
+        svc:         JSON.stringify(svcArray),
+        notes:       "",
         benefits
       })
     });
 
     if (!res.ok) throw new Error(await res.text());
-
     showConfirmation({ name, benefits });
 
   } catch(e) {
-    btn.disabled = false;
+    btn.disabled    = false;
     btn.textContent = "Unirme a Familia Canexion";
     alert("Error de conexión. Comprueba tu conexión e inténtalo de nuevo.");
   }
 }
 
-// ── CONSTRUIR BENEFICIOS PARA EL CLIENTE ─────────────────
-function buildBenefits(svc) {
+// ── CONSTRUIR BENEFICIOS ──────────────────────────────────
+function buildBenefits(svcKey) {
   const benefits = [...benefitTemplates]
     .sort((a, b) => a.order_index - b.order_index)
     .map(t => ({
@@ -348,11 +443,10 @@ function buildBenefits(svc) {
       status: t.dot_type === "always" ? "always" : "active",
       dot:    t.dot_type === "always" ? "always" : "active"
     }));
-
-  const coupon = discoveryCoupons.find(c => c.svc === svc);
+  const coupon = discoveryCoupons.find(c => c.svc === svcKey);
   if (coupon && coupon.active && coupon.name) {
     benefits.splice(2, 0, {
-      id:       "disc_" + svc,
+      id:       "disc_" + svcKey,
       name:     coupon.name,
       desc:     coupon.description,
       discount: coupon.discount,
