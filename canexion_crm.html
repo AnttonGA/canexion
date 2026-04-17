@@ -1612,13 +1612,14 @@ function analyzePatterns(members, wkMap) {
     return s && s.hasActivity;
   });
   const recs = [];
+  const min = Math.max(1, Math.round(active.length * 0.10)); // mínimo 10% de activos
 
   // 1 — Sin visita en >60 días
   const noVisit = active.filter(m => {
     const s = wkMap[m.phone.replace(/\D/g,"")];
     return s && s.lastVisitDaysAgo !== null && s.lastVisitDaysAgo > 60;
   });
-  if (noVisit.length >= 1) recs.push({
+  if (noVisit.length >= min) recs.push({
     icon:"📅", impact: noVisit.length,
     title: "Clientes sin visita reciente",
     desc:  `${noVisit.length} miembro${noVisit.length>1?"s":""} activo${noVisit.length>1?"s":""} lleva${noVisit.length>1?"n":""} más de 60 días sin visitar la clínica.`,
@@ -1629,7 +1630,7 @@ function analyzePatterns(members, wkMap) {
 
   // 2 — Solo clínica, sin tienda
   const clinicOnly = active.filter(m => m.svcArray.length === 1 && m.svcArray.includes("clinica"));
-  if (clinicOnly.length >= 1) recs.push({
+  if (clinicOnly.length >= min) recs.push({
     icon:"🛒", impact: clinicOnly.length,
     title: "Clientes de clínica sin conocer la tienda",
     desc:  `${clinicOnly.length} miembro${clinicOnly.length>1?"s":""} solo usa${clinicOnly.length>1?"n":""} la clínica. Son candidatos perfectos para descubrir la tienda.`,
@@ -1640,7 +1641,7 @@ function analyzePatterns(members, wkMap) {
 
   // 3 — Gatos sin peluquería
   const catNoGroom = active.filter(m => m.pets.some(p=>p.species==="Gato") && !m.svcArray.includes("peluqueria"));
-  if (catNoGroom.length >= 1) recs.push({
+  if (catNoGroom.length >= min) recs.push({
     icon:"✂️", impact: catNoGroom.length,
     title: "Dueños de gatos sin servicio de peluquería",
     desc:  `${catNoGroom.length} miembro${catNoGroom.length>1?"s":""} tiene${catNoGroom.length>1?"n":""} gato y no usa${catNoGroom.length>1?"n":""} la peluquería.`,
@@ -1651,7 +1652,7 @@ function analyzePatterns(members, wkMap) {
 
   // 4 — Cumpleaños próximos (30 días) — sólo activos
   const bdays = active.filter(m => m.pets.some(p => checkBirthdayDays(p.pet_bday, 30)));
-  if (bdays.length >= 1) recs.push({
+  if (bdays.length >= min) recs.push({
     icon:"🎂", impact: bdays.length,
     title: "Mascotas con cumpleaños en los próximos 30 días",
     desc:  `${bdays.length} mascota${bdays.length>1?"s":""} de miembros activos cumplen años este mes.`,
@@ -1665,7 +1666,7 @@ function analyzePatterns(members, wkMap) {
     const s = wkMap[m.phone.replace(/\D/g,"")];
     return s && s.spentThisYear > 200 && !(m.benefits||[]).some(b=>b.dot==="campaign"&&b.status==="active");
   });
-  if (highSpend.length >= 1) recs.push({
+  if (highSpend.length >= min) recs.push({
     icon:"⭐", impact: highSpend.length,
     title: "Clientes de alto valor sin reconocimiento",
     desc:  `${highSpend.length} miembro${highSpend.length>1?"s":""} ha${highSpend.length>1?"n":""} gastado más de 200€ en el último año y no tiene${highSpend.length>1?"n":""} ningún cupón de campaña activo.`,
@@ -1676,7 +1677,7 @@ function analyzePatterns(members, wkMap) {
 
   // 6 — Miembros veteranos (>12 meses) sin campaña activa
   const loyal = active.filter(m => getSinceMonths(m.since) > 12 && !(m.benefits||[]).some(b=>b.dot==="campaign"&&b.status==="active"));
-  if (loyal.length >= 1) recs.push({
+  if (loyal.length >= min) recs.push({
     icon:"💎", impact: loyal.length,
     title: "Miembros veteranos sin campaña activa",
     desc:  `${loyal.length} miembro${loyal.length>1?"s":""} lleva${loyal.length>1?"n":""} más de un año en Familia Canexion sin ningún cupón de campaña activo.`,
@@ -1687,7 +1688,7 @@ function analyzePatterns(members, wkMap) {
 
   // 7 — Beneficios activos sin canjear
   const unclaimed = active.filter(m => (m.benefits||[]).some(b=>b.status==="active"&&b.dot!=="always"));
-  if (unclaimed.length >= 2) recs.push({
+  if (unclaimed.length >= min) recs.push({
     icon:"🎁", impact: unclaimed.length,
     title: "Miembros con beneficios sin canjear",
     desc:  `${unclaimed.length} miembros activos tienen beneficios disponibles que aún no han usado.`,
