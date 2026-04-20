@@ -278,6 +278,24 @@ input:checked+.togslider:before{transform:translateX(16px);}
 .wk-val{font-size:13px;font-weight:500;color:var(--tp);}
 .wk-val.warn{color:#9a6010;}
 .wk-badge{display:inline-block;font-size:10px;font-weight:500;padding:2px 7px;border-radius:20px;background:var(--ap);color:#9a6010;margin-top:3px;}
+/* INVITE BAR */
+.invite-bar{position:fixed;bottom:0;left:0;right:0;background:#16162a;border-top:2px solid #5a3abf;z-index:300;padding:0;box-shadow:0 -4px 20px rgba(90,58,191,.25);}
+.invite-bar-inner{max-width:480px;margin:0 auto;}
+.invite-bar-header{display:flex;align-items:center;padding:7px 16px 5px;border-bottom:1px solid #2a2a4c;}
+.invite-bar-title{font-size:11px;font-weight:700;color:#9a80d8;letter-spacing:.5px;text-transform:uppercase;}
+.invite-item{display:flex;align-items:center;gap:10px;padding:9px 16px;border-bottom:1px solid #1e1e38;}
+.invite-item:last-child{border-bottom:none;}
+.invite-info{flex:1;min-width:0;}
+.invite-name{font-size:13px;font-weight:600;color:#e8e8f8;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.invite-phone{font-size:11px;color:#7070a0;margin-top:1px;}
+.invite-add-btn{background:#7c5cbf;color:#fff;border:none;border-radius:6px;padding:7px 13px;font-size:12px;font-weight:600;cursor:pointer;white-space:nowrap;flex-shrink:0;}
+.invite-add-btn:hover{background:#6a4aad;}
+.invite-dec-btn{background:transparent;color:#5050a0;border:none;padding:4px 8px;cursor:pointer;font-size:15px;flex-shrink:0;}
+.invite-dec-btn:hover{color:#aaaacc;}
+/* PREPARAR INVITACIONES */
+.inv-prep-wrap{padding:6px 16px 0;display:flex;justify-content:flex-end;}
+.inv-prep-btn{background:transparent;border:1px solid var(--bd);color:var(--tm);border-radius:var(--rs);padding:5px 11px;font-size:11px;cursor:pointer;transition:background .15s;}
+.inv-prep-btn:hover{background:var(--sf);}
 </style>
 </head>
 <body>
@@ -329,6 +347,9 @@ input:checked+.togslider:before{transform:translateX(16px);}
       <div class="litem"><div class="ldot" style="background:var(--gs)"></div>Beneficios activos</div>
       <div class="litem"><div class="ldot" style="background:var(--am)"></div>Cumpleaños</div>
       <div class="litem"><div class="ldot" style="background:var(--pu)"></div>Campaña</div>
+    </div>
+    <div class="inv-prep-wrap">
+      <button class="inv-prep-btn" id="inv-prep-btn" onclick="prepareInvites()">📋 Preparar invitaciones del día</button>
     </div>
     <div class="rlist" id="rl">
       <div class="loading-state"><div class="spinner"></div>Cargando miembros...</div>
@@ -830,6 +851,7 @@ function showApp() {
   document.getElementById("app").style.display          = "block";
   document.getElementById("fab").style.display          = "flex";
   loadAll();
+  startInvitePolling();
 }
 window.addEventListener("DOMContentLoaded", () => {
   if (sessionStorage.getItem(SESSION_KEY) === "1") showApp();
@@ -1201,6 +1223,16 @@ async function addClient() {
     renderList(filtered);
     closeModal("modal-client");
     showToast(name + " añadido/a ✓");
+    // Marcar invitación Wakyma como registrada si viene del flujo de invitaciones
+    if (window._currentInviteId) {
+      const inv = _activeInvites.find(i => i.id === window._currentInviteId);
+      if (inv) {
+        sb("PATCH", "wk_invites", { filter: "id=eq." + inv.id, body: { status: "registered" } }).catch(() => {});
+        _activeInvites = _activeInvites.filter(i => i.id !== window._currentInviteId);
+        renderInviteBar(_activeInvites);
+      }
+      window._currentInviteId = null;
+    }
     // Reset
     ["fn","fph","fe","fcp"].forEach(id => document.getElementById(id).value = "");
     document.getElementById("fpetcount").value = "1";
@@ -1804,6 +1836,112 @@ function addConditionWithValue(field, value) {
     valCtrl.addEventListener("input",  autoPreview);
     valCtrl.addEventListener("change", autoPreview);
   }
+}
+
+// ── INVITACIONES WAKYMA ────────────────────────────────────
+let _inviteTimer    = null;
+let _activeInvites  = [];
+window._currentInviteId = null;
+
+function startInvitePolling() {
+  pollWkInvites();
+  if (_inviteTimer) clearInterval(_inviteTimer);
+  _inviteTimer = setInterval(pollWkInvites, 120000); // cada 2 min
+}
+
+async function pollWkInvites() {
+  try {
+    // Cargar invitaciones pendientes desde Supabase
+    const invites = await sb("GET", "wk_invites", { filter: "status=eq.pending" });
+    if (!invites || !invites.length) { renderInviteBar([]); return; }
+
+    // Para cada una, comprobar estado del recordatorio en Wakyma
+    const completed = [];
+    for (const inv of invites) {
+      try {
+        const remRes = await wk("/api/v3/reminders/" + inv.wk_reminder_id);
+        const state  = remRes.state !== undefined ? remRes.state
+                     : (remRes.data  !== undefined ? remRes.data.state : undefined);
+        if (state === 1) completed.push(inv); // 1 = completado
+      } catch(e) { /* ignorar errores individuales */ }
+    }
+    renderInviteBar(completed);
+  } catch(e) { /* ignorar errores de polling */ }
+}
+
+function renderInviteBar(invites) {
+  _activeInvites = invites;
+  let bar = document.getElementById("invite-bar");
+  if (!bar) {
+    bar = document.createElement("div");
+    bar.id        = "invite-bar";
+    bar.className = "invite-bar";
+    document.body.appendChild(bar);
+  }
+  if (!invites.length) { bar.style.display = "none"; return; }
+  bar.style.display = "block";
+  bar.innerHTML = `
+    <div class="invite-bar-inner">
+      <div class="invite-bar-header">
+        <span class="invite-bar-title">⚡ Quieren unirse a Familia Canexion</span>
+      </div>
+      ${invites.map(inv => `
+      <div class="invite-item" id="invite-row-${inv.id}">
+        <div class="invite-info">
+          <div class="invite-name">${inv.client_name || "Cliente sin nombre"}</div>
+          <div class="invite-phone">${inv.client_phone || ""}</div>
+        </div>
+        <button class="invite-add-btn" onclick="registerFromInvite(${inv.id})">Añadir →</button>
+        <button class="invite-dec-btn" onclick="declineInvite(${inv.id})" title="Descartar">✕</button>
+      </div>`).join("")}
+    </div>`;
+}
+
+async function registerFromInvite(inviteId) {
+  const inv = _activeInvites.find(i => i.id === inviteId);
+  if (!inv) return;
+  window._currentInviteId = inviteId;
+  openNewClientModal();
+  // Esperar a que el modal esté renderizado y pre-rellenar teléfono
+  await new Promise(r => setTimeout(r, 120));
+  const phoneEl = document.getElementById("fph-wk");
+  if (phoneEl && inv.client_phone) {
+    phoneEl.value = inv.client_phone;
+    searchWakyma();
+  }
+}
+
+async function declineInvite(inviteId) {
+  const inv = _activeInvites.find(i => i.id === inviteId);
+  if (!inv) return;
+  try {
+    await sb("PATCH", "wk_invites", { filter: "id=eq." + inv.id, body: { status: "declined" } });
+  } catch(e) { /* ignorar */ }
+  _activeInvites = _activeInvites.filter(i => i.id !== inviteId);
+  renderInviteBar(_activeInvites);
+}
+
+async function prepareInvites() {
+  const btn = document.getElementById("inv-prep-btn");
+  btn.disabled    = true;
+  btn.textContent = "Preparando...";
+  try {
+    const r    = await fetch("/.netlify/functions/wk-morning-invites", { method: "POST" });
+    const data = await r.json();
+    if (data.success) {
+      const n = data.created;
+      showToast(n === 0
+        ? (data.message || "Sin clientes nuevos para mañana")
+        : `${n} recordatorio${n !== 1 ? "s" : ""} creado${n !== 1 ? "s" : ""} en Wakyma ✓`);
+      pollWkInvites();
+    } else {
+      showToast("Error: " + (data.error || "desconocido"), true);
+    }
+  } catch(e) {
+    showToast("Error al preparar invitaciones: " + e.message, true);
+  }
+  btn.disabled    = false;
+  btn.textContent = "📋 Preparar invitaciones del día";
 }
 
 // ── MODALES ───────────────────────────────────────────────
