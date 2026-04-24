@@ -296,6 +296,18 @@ input:checked+.togslider:before{transform:translateX(16px);}
 .inv-prep-wrap{padding:6px 16px 0;display:flex;justify-content:flex-end;}
 .inv-prep-btn{background:transparent;border:1px solid var(--bd);color:var(--tm);border-radius:var(--rs);padding:5px 11px;font-size:11px;cursor:pointer;transition:background .15s;}
 .inv-prep-btn:hover{background:var(--sf);}
+/* PRIVACIDAD */
+.privacy-group{margin:14px 0 10px;display:flex;flex-direction:column;gap:10px;}
+.privacy-item{display:flex;align-items:flex-start;gap:9px;cursor:pointer;}
+.privacy-item input[type=checkbox]{margin-top:2px;flex-shrink:0;accent-color:var(--pu);width:15px;height:15px;cursor:pointer;}
+.privacy-item span{font-size:12px;color:var(--ts);line-height:1.45;}
+.privacy-item.required span{color:var(--tp);}
+.privacy-link{color:var(--pu);text-decoration:underline;cursor:pointer;}
+/* MODAL POLÍTICA */
+.policy-body{padding:4px 0 8px;max-height:55vh;overflow-y:auto;font-size:12px;color:var(--ts);line-height:1.6;}
+.policy-body h3{font-size:13px;font-weight:600;color:var(--tp);margin:14px 0 4px;}
+.policy-body h3:first-child{margin-top:0;}
+.policy-body p{margin:0 0 8px;}
 </style>
 </head>
 <body>
@@ -493,8 +505,48 @@ input:checked+.togslider:before{transform:translateX(16px);}
         <label class="check-item"><input type="checkbox" value="peluqueria"/> Peluquería</label>
       </div>
     </div>
+    <!-- Privacidad -->
+    <div class="privacy-group">
+      <label class="privacy-item required">
+        <input type="checkbox" id="check-privacy"/>
+        <span>He leído y acepto la <a class="privacy-link" onclick="openModal('modal-privacy')" href="javascript:void(0)">política de privacidad</a> para la gestión de mi membresía en Familia Canexion. <strong>*</strong></span>
+      </label>
+      <label class="privacy-item">
+        <input type="checkbox" id="check-marketing"/>
+        <span>Acepto recibir comunicaciones comerciales y promociones de Canexion (opcional).</span>
+      </label>
+    </div>
     <button class="subbtn" id="sbtn-client" onclick="addClient()">Dar de alta</button>
     <span class="cancelink" onclick="closeModal('modal-client')">Cancelar</span>
+  </div>
+</div>
+
+<!-- ── MODAL: POLÍTICA DE PRIVACIDAD ────────────────────── -->
+<div class="overlay" id="modal-privacy" onclick="closeModalOut(event,'modal-privacy')">
+  <div class="msheet">
+    <div class="mhandle"></div>
+    <div class="mtitle">Política de privacidad</div>
+    <div class="policy-body">
+      <h3>Responsable del tratamiento</h3>
+      <p>Clínica veterinaria Canexion. Para ejercer tus derechos o cualquier consulta sobre privacidad, escríbenos a <strong>[EMAIL DE CONTACTO]</strong>.</p>
+
+      <h3>Finalidad y base legal</h3>
+      <p><strong>Gestión del programa Familia Canexion</strong> — gestionar tu alta como miembro, asignarte beneficios y comunicarte los que te corresponden. Base legal: tu consentimiento (art. 6.1.a RGPD).</p>
+      <p><strong>Comunicaciones comerciales</strong> (solo si marcas la casilla opcional) — enviarte promociones, descuentos y novedades. Base legal: tu consentimiento explícito. Puedes retirarlo en cualquier momento.</p>
+
+      <h3>Datos que tratamos</h3>
+      <p>Nombre, teléfono, correo electrónico, código postal e información de tus mascotas (nombre, especie, raza, fecha de nacimiento).</p>
+
+      <h3>Conservación</h3>
+      <p>Mientras permanezcas como miembro del programa o hasta que retires tu consentimiento.</p>
+
+      <h3>Destinatarios</h3>
+      <p>Los datos no se ceden a terceros salvo obligación legal. Se almacenan en Supabase (infraestructura con servidores en la UE).</p>
+
+      <h3>Tus derechos</h3>
+      <p>Puedes acceder, rectificar, suprimir, limitar, portar u oponerte al tratamiento de tus datos en cualquier momento escribiendo a <strong>[EMAIL DE CONTACTO]</strong>. También puedes reclamar ante la Agencia Española de Protección de Datos en <strong>www.aepd.es</strong>.</p>
+    </div>
+    <button class="subbtn" onclick="closeModal('modal-privacy')" style="margin-top:8px;">Entendido</button>
   </div>
 </div>
 
@@ -1196,6 +1248,10 @@ async function addClient() {
   // Recoger servicios
   const svcArray = Array.from(document.querySelectorAll('#modal-svc-group input:checked')).map(cb => cb.value);
   if (!svcArray.length) { showToast("Selecciona al menos un servicio", true); return; }
+  if (!document.getElementById("check-privacy").checked) {
+    showToast("Debes aceptar la política de privacidad para continuar", true); return;
+  }
+  const marketingConsent = document.getElementById("check-marketing").checked;
 
   const btn = document.getElementById("sbtn-client");
   btn.disabled = true; btn.textContent = "Guardando...";
@@ -1214,7 +1270,8 @@ async function addClient() {
       pet:         pets[0].name,
       species:     pets[0].species,
       pet_bday:    pets[0].pet_bday || null,
-      svc:         JSON.stringify(svcArray),
+      svc:               JSON.stringify(svcArray),
+      marketing_consent: marketingConsent,
       notes: "", benefits
     }});
     const mapped = mapClient(result[0]);
@@ -1234,6 +1291,8 @@ async function addClient() {
       window._currentInviteId = null;
     }
     // Reset
+    document.getElementById("check-privacy").checked   = false;
+    document.getElementById("check-marketing").checked = false;
     ["fn","fph","fe","fcp"].forEach(id => document.getElementById(id).value = "");
     document.getElementById("fpetcount").value = "1";
     renderModalPetForms(1);
