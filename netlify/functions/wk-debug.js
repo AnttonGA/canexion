@@ -12,37 +12,20 @@ async function tryFetch(url, headers) {
 }
 
 exports.handler = async () => {
-  const phone = "607417207"; // cambiar por un teléfono real de Wakyma si hace falta
+  const auth = { "Authorization": "Bearer " + WAKYMA_KEY };
 
   const tests = await Promise.all([
-    // Test 1: URL y auth actuales
-    tryFetch(`https://api.wakyma.com/api/v3/clients?phone=${phone}`, {
-      "Authorization": "Bearer " + WAKYMA_KEY
-    }),
-    // Test 2: Sin /api/ en la ruta
-    tryFetch(`https://api.wakyma.com/v3/clients?phone=${phone}`, {
-      "Authorization": "Bearer " + WAKYMA_KEY
-    }),
-    // Test 3: Auth con X-Api-Key en vez de Bearer
-    tryFetch(`https://api.wakyma.com/api/v3/clients?phone=${phone}`, {
-      "X-Api-Key": WAKYMA_KEY
-    }),
-    // Test 4: Auth con apikey (minúsculas)
-    tryFetch(`https://api.wakyma.com/api/v3/clients?phone=${phone}`, {
-      "apikey": WAKYMA_KEY
-    }),
-    // Test 5: Base sin parámetros (¿devuelve lista?)
-    tryFetch(`https://api.wakyma.com/api/v3/clients`, {
-      "Authorization": "Bearer " + WAKYMA_KEY
-    }),
-    // Test 6: Parámetro telephone en vez de phone
-    tryFetch(`https://api.wakyma.com/api/v3/clients?telephone=${phone}`, {
-      "Authorization": "Bearer " + WAKYMA_KEY
-    }),
-    // Test 7: Parámetro mobile
-    tryFetch(`https://api.wakyma.com/api/v3/clients?mobile=${phone}`, {
-      "Authorization": "Bearer " + WAKYMA_KEY
-    }),
+    // Probar distintas URLs base
+    tryFetch("https://api.wakyma.com/api/v3/clients",       auth),
+    tryFetch("https://wakyma.com/api/v3/clients",            auth),
+    tryFetch("https://app.wakyma.com/api/v3/clients",        auth),
+    tryFetch("https://api.wakyma.com/api/v3/",               auth),
+    tryFetch("https://wakyma.com/api/v3/",                   auth),
+    tryFetch("https://app.wakyma.com/api/v3/",               auth),
+    // Raíz de cada dominio (para ver qué responde)
+    tryFetch("https://api.wakyma.com/",                      auth),
+    tryFetch("https://wakyma.com/",                          auth),
+    tryFetch("https://app.wakyma.com/",                      auth),
   ]);
 
   return {
