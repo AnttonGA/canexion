@@ -308,6 +308,11 @@ input:checked+.togslider:before{transform:translateX(16px);}
 .policy-body h3{font-size:13px;font-weight:600;color:var(--tp);margin:14px 0 4px;}
 .policy-body h3:first-child{margin-top:0;}
 .policy-body p{margin:0 0 8px;}
+/* BADGE CONSENTIMIENTO */
+.consent-badge{display:inline-flex;align-items:center;gap:5px;font-size:12px;font-weight:500;padding:5px 11px;border-radius:20px;}
+.consent-badge.yes{background:#e8f0fe;color:#1a56a0;}
+.consent-badge.no{background:var(--sf);color:var(--tm);border:1px solid var(--bd);}
+.preview-excluded{font-size:11px;color:#9a6010;margin-top:6px;padding:5px 9px;background:var(--ap);border-radius:6px;}
 </style>
 </head>
 <body>
@@ -395,6 +400,11 @@ input:checked+.togslider:before{transform:translateX(16px);}
     <div class="sec" style="margin-top:12px;">
       <div class="seclabel">Código postal</div>
       <div class="pcval" id="pcp">—</div>
+    </div>
+    <!-- Consentimiento comunicaciones -->
+    <div class="sec" style="margin-top:12px;">
+      <div class="seclabel">Comunicaciones</div>
+      <div id="p-consent"></div>
     </div>
     <!-- Panel Wakyma -->
     <div class="wk-panel-sec" id="wk-panel-sec">
@@ -846,9 +856,10 @@ function mapClient(c) {
     pets:         pets,
     svcArray:     svcArray,
     benefits:     Array.isArray(c.benefits) ? c.benefits : [],
-    birthdayWeek: birthdayPets.length > 0,
-    birthdayPets: birthdayPets,
-    petAge:       pets.length > 0 ? getPetAge(pets[0].pet_bday) : null
+    birthdayWeek:      birthdayPets.length > 0,
+    birthdayPets:      birthdayPets,
+    petAge:            pets.length > 0 ? getPetAge(pets[0].pet_bday) : null,
+    marketing_consent: c.marketing_consent === true
   };
 }
 
@@ -1017,6 +1028,11 @@ function openProfile(id) {
 
   // Código postal
   document.getElementById("pcp").textContent = c.postal_code || "—";
+
+  // Consentimiento comunicaciones
+  document.getElementById("p-consent").innerHTML = c.marketing_consent
+    ? '<span class="consent-badge yes">✓ Acepta comunicaciones comerciales</span>'
+    : '<span class="consent-badge no">✕ No acepta comunicaciones comerciales</span>';
 
   document.getElementById("pno").value = c.notes || "";
 
@@ -1475,13 +1491,24 @@ async function runPreview() {
     });
   }
 
+  // Filtrar por consentimiento de comunicaciones comerciales (RGPD)
+  const beforeConsent  = candidates.length;
+  candidates           = candidates.filter(c => c.marketing_consent);
+  const excludedCount  = beforeConsent - candidates.length;
+
   previewedClients = candidates;
   const count = candidates.length;
   document.getElementById("prev-count").textContent = count;
   document.getElementById("prev-unit").textContent  = count === 1 ? "miembro" : "miembros";
+
+  const excludedNote = excludedCount > 0
+    ? `<div class="preview-excluded">⚠ ${excludedCount} miembro${excludedCount > 1 ? "s" : ""} excluido${excludedCount > 1 ? "s" : ""} por no haber aceptado comunicaciones comerciales</div>`
+    : "";
   document.getElementById("prev-names").innerHTML   =
     candidates.slice(0,8).map(c => `<div class="preview-name">· ${c.name} (${c.pets.map(p=>p.name).join(", ")})</div>`).join("") +
-    (candidates.length > 8 ? `<div class="preview-name" style="color:var(--tm)">...y ${candidates.length-8} más</div>` : "");
+    (candidates.length > 8 ? `<div class="preview-name" style="color:var(--tm)">...y ${candidates.length-8} más</div>` : "") +
+    excludedNote;
+
   const lb = document.getElementById("launch-btn");
   if (lb) {
     lb.textContent      = count > 0 ? "Lanzar campaña — " + count + " miembro" + (count > 1 ? "s" : "") : "Guardar campaña (sin asignar)";
