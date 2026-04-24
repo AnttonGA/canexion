@@ -1,5 +1,5 @@
 // Función de diagnóstico — borrar después de resolver el problema
-const WAKYMA_KEY = "0jIXmFzxFwMEy5U2BlEvj3dgGuL0pcDasLKfsmXgD-NkYEiX";
+const WAKYMA_KEY = "hcV9EhBNSXVINsvhuo4Oxuoy5_jR-6aaaqTWBotDies1da4R";
 
 async function tryFetch(url, headers) {
   try {
