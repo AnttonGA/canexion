@@ -94,6 +94,24 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--tp);min-h
 /* ERRORES */
 .field-error{font-size:12px;color:#8a2020;margin-top:4px;display:none;}
 .fi.error,.fsel.error{border-color:#d09090;}
+/* PRIVACIDAD */
+.privacy-group{margin:18px 0 0;display:flex;flex-direction:column;gap:12px;}
+.privacy-item{display:flex;align-items:flex-start;gap:10px;cursor:pointer;}
+.privacy-item input[type=checkbox]{margin-top:3px;flex-shrink:0;accent-color:var(--gm);width:18px;height:18px;cursor:pointer;}
+.privacy-item span{font-size:13px;color:var(--ts);line-height:1.5;}
+.privacy-item.required span{color:var(--tp);font-weight:500;}
+.privacy-link{color:var(--gm);text-decoration:underline;cursor:pointer;}
+.privacy-err{font-size:12px;color:#8a2020;margin-top:4px;display:none;}
+/* MODAL POLÍTICA */
+.pol-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:200;align-items:flex-end;justify-content:center;}
+.pol-overlay.open{display:flex;}
+.pol-sheet{background:white;border-radius:16px 16px 0 0;padding:24px 20px 32px;max-height:80vh;overflow-y:auto;width:100%;max-width:480px;}
+.pol-title{font-size:16px;font-weight:500;color:var(--tp);margin-bottom:14px;}
+.pol-body{font-size:12px;color:var(--ts);line-height:1.65;}
+.pol-body h3{font-size:13px;font-weight:600;color:var(--tp);margin:13px 0 3px;}
+.pol-body h3:first-child{margin-top:0;}
+.pol-body p{margin:0 0 7px;}
+.pol-close{width:100%;margin-top:18px;background:var(--gm);border:none;border-radius:var(--r);padding:14px;font-family:'DM Sans',sans-serif;font-size:15px;font-weight:500;color:white;cursor:pointer;}
 </style>
 </head>
 <body>
@@ -162,8 +180,20 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--tp);min-h
         </div>
       </div>
 
+      <!-- Privacidad RGPD -->
+      <div class="privacy-group">
+        <label class="privacy-item required">
+          <input type="checkbox" id="check-privacy"/>
+          <span>He leído y acepto la <a class="privacy-link" onclick="openPolicy()" href="javascript:void(0)">política de privacidad</a> para la gestión de mi membresía en Familia Canexion. *</span>
+        </label>
+        <label class="privacy-item">
+          <input type="checkbox" id="check-marketing"/>
+          <span>Acepto recibir comunicaciones comerciales y promociones de Canexion (opcional).</span>
+        </label>
+        <div class="privacy-err" id="err-privacy">Debes aceptar la política de privacidad para continuar</div>
+      </div>
+
       <button class="submit-btn" id="sbtn" onclick="submitForm()">Unirme a Familia Canexion</button>
-      <div class="terms">Al registrarte aceptas que Canexion guarde tus datos para gestionar tu programa de fidelización. Puedes solicitar su eliminación en cualquier momento contactando con nosotros.</div>
     </div>
   </div>
 </div>
@@ -193,6 +223,34 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--tp);min-h
     </div>
 
     <a class="back-link" href="https://canexion.es">Volver a canexion.es</a>
+  </div>
+</div>
+
+<!-- MODAL POLÍTICA DE PRIVACIDAD -->
+<div class="pol-overlay" id="pol-overlay" onclick="if(event.target===this)closePolicy()">
+  <div class="pol-sheet">
+    <div class="pol-title">Política de privacidad</div>
+    <div class="pol-body">
+      <h3>Responsable del tratamiento</h3>
+      <p>Clínica veterinaria Canexion. Para ejercer tus derechos o cualquier consulta sobre privacidad, escríbenos a <strong>marketingcanexion@gmail.com</strong>.</p>
+
+      <h3>Finalidad y base legal</h3>
+      <p><strong>Gestión del programa Familia Canexion</strong> — gestionar tu alta como miembro, asignarte beneficios y comunicarte los que te corresponden. Base legal: tu consentimiento (art. 6.1.a RGPD).</p>
+      <p><strong>Comunicaciones comerciales</strong> (solo si marcas la casilla opcional) — enviarte promociones, descuentos y novedades. Base legal: tu consentimiento explícito. Puedes retirarlo en cualquier momento.</p>
+
+      <h3>Datos que tratamos</h3>
+      <p>Nombre, teléfono, correo electrónico, código postal e información de tus mascotas (nombre, especie, raza, fecha de nacimiento).</p>
+
+      <h3>Conservación</h3>
+      <p>Mientras permanezcas como miembro del programa o hasta que retires tu consentimiento.</p>
+
+      <h3>Destinatarios</h3>
+      <p>Los datos no se ceden a terceros salvo obligación legal. Se almacenan en Supabase (infraestructura con servidores en la UE).</p>
+
+      <h3>Tus derechos</h3>
+      <p>Puedes acceder, rectificar, suprimir, limitar, portar u oponerte al tratamiento de tus datos en cualquier momento escribiendo a <strong>marketingcanexion@gmail.com</strong>. También puedes reclamar ante la Agencia Española de Protección de Datos en <strong>www.aepd.es</strong>.</p>
+    </div>
+    <button class="pol-close" onclick="closePolicy()">Entendido</button>
   </div>
 </div>
 
@@ -352,6 +410,14 @@ function validate() {
   if (!svcChecked) { svcErr.style.display = "block"; ok = false; }
   else             { svcErr.style.display = "none"; }
 
+  // Política de privacidad (obligatoria)
+  const privacyErr = document.getElementById("err-privacy");
+  if (!document.getElementById("check-privacy").checked) {
+    privacyErr.style.display = "block"; ok = false;
+  } else {
+    privacyErr.style.display = "none";
+  }
+
   return ok;
 }
 
@@ -416,8 +482,9 @@ async function submitForm() {
         pet:         pets[0].name,
         species:     pets[0].species,
         pet_bday:    pets[0].pet_bday || null,
-        svc:         JSON.stringify(svcArray),
-        notes:       "",
+        svc:               JSON.stringify(svcArray),
+        marketing_consent: document.getElementById("check-marketing").checked,
+        notes:             "",
         benefits
       })
     });
@@ -487,6 +554,8 @@ function formatSince() {
   const d  = new Date();
   return ms[d.getMonth()] + " " + d.getFullYear();
 }
+function openPolicy()  { document.getElementById("pol-overlay").classList.add("open"); }
+function closePolicy() { document.getElementById("pol-overlay").classList.remove("open"); }
 </script>
 </body>
 </html>
