@@ -278,24 +278,36 @@ input:checked+.togslider:before{transform:translateX(16px);}
 .wk-val{font-size:13px;font-weight:500;color:var(--tp);}
 .wk-val.warn{color:#9a6010;}
 .wk-badge{display:inline-block;font-size:10px;font-weight:500;padding:2px 7px;border-radius:20px;background:var(--ap);color:#9a6010;margin-top:3px;}
-/* INVITE BAR */
-.invite-bar{position:fixed;bottom:0;left:0;right:0;background:#16162a;border-top:2px solid #5a3abf;z-index:300;padding:0;box-shadow:0 -4px 20px rgba(90,58,191,.25);}
-.invite-bar-inner{max-width:480px;margin:0 auto;}
-.invite-bar-header{display:flex;align-items:center;padding:7px 16px 5px;border-bottom:1px solid #2a2a4c;}
-.invite-bar-title{font-size:11px;font-weight:700;color:#9a80d8;letter-spacing:.5px;text-transform:uppercase;}
-.invite-item{display:flex;align-items:center;gap:10px;padding:9px 16px;border-bottom:1px solid #1e1e38;}
-.invite-item:last-child{border-bottom:none;}
-.invite-info{flex:1;min-width:0;}
-.invite-name{font-size:13px;font-weight:600;color:#e8e8f8;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
-.invite-phone{font-size:11px;color:#7070a0;margin-top:1px;}
-.invite-add-btn{background:#7c5cbf;color:#fff;border:none;border-radius:6px;padding:7px 13px;font-size:12px;font-weight:600;cursor:pointer;white-space:nowrap;flex-shrink:0;}
-.invite-add-btn:hover{background:#6a4aad;}
-.invite-dec-btn{background:transparent;color:#5050a0;border:none;padding:4px 8px;cursor:pointer;font-size:15px;flex-shrink:0;}
-.invite-dec-btn:hover{color:#aaaacc;}
-/* PREPARAR INVITACIONES */
-.inv-prep-wrap{padding:6px 16px 0;display:flex;justify-content:flex-end;}
-.inv-prep-btn{background:transparent;border:1px solid var(--bd);color:var(--tm);border-radius:var(--rs);padding:5px 11px;font-size:11px;cursor:pointer;transition:background .15s;}
-.inv-prep-btn:hover{background:var(--sf);}
+/* FILTER CHIPS */
+.chips-row{padding:8px 20px 2px;display:flex;gap:5px;flex-wrap:wrap;}
+.chip{border:1px solid var(--bd);background:var(--sf);border-radius:20px;padding:5px 11px;font-size:11px;font-weight:500;color:var(--ts);cursor:pointer;white-space:nowrap;transition:all .15s;user-select:none;}
+.chip:hover{border-color:var(--gs);color:var(--gm);}
+.chip.on{background:var(--gm);border-color:var(--gm);color:white;}
+.chip.on-amber{background:var(--am);border-color:var(--am);color:white;}
+.chip.on-purple{background:var(--pu);border-color:var(--pu);color:white;}
+/* FILTER BAR */
+.filter-bar{padding:4px 20px 0;display:none;align-items:center;justify-content:space-between;gap:8px;}
+.filter-count{font-size:11px;color:var(--tm);}
+.filter-count strong{color:var(--tp);}
+.filter-bar-right{display:flex;align-items:center;gap:6px;}
+.filter-clear{background:none;border:none;font-size:11px;color:var(--tm);cursor:pointer;padding:0;text-decoration:underline;}
+.sort-sel{background:var(--sf);border:1px solid var(--bd);border-radius:20px;padding:3px 8px;font-size:11px;color:var(--ts);cursor:pointer;font-family:'DM Sans',sans-serif;outline:none;}
+/* GROUP MSG */
+.group-msg-wrap{margin:8px 20px 0;display:none;}
+.group-msg-btn{width:100%;background:var(--pu);border:none;border-radius:var(--rs);padding:9px;font-family:'DM Sans',sans-serif;font-size:13px;font-weight:500;color:white;cursor:pointer;}
+.group-msg-btn:hover{background:#4a2a8a;}
+.group-msg-panel{background:var(--sf);border:1px solid var(--bd);border-radius:var(--r);padding:14px;margin-top:8px;display:none;}
+.group-msg-panel.open{display:block;}
+.group-msg-vars{font-size:11px;color:var(--tm);margin-bottom:6px;}
+.group-msg-tpl{width:100%;background:var(--bg);border:1px solid var(--bd);border-radius:var(--rs);padding:10px 12px;font-family:'DM Sans',sans-serif;font-size:13px;color:var(--tp);resize:vertical;min-height:80px;outline:none;margin-bottom:10px;display:block;}
+.group-msg-tpl:focus{border-color:var(--gs);}
+/* REMIND BTN */
+.remind-btn{background:none;border:1px solid var(--pu);border-radius:20px;padding:4px 10px;font-family:'DM Sans',sans-serif;font-size:11px;font-weight:500;color:var(--pu);cursor:pointer;white-space:nowrap;flex-shrink:0;margin-left:4px;}
+.remind-btn:hover{background:var(--pup);}
+/* EXPIRY ALERT */
+.expiry-alert{margin:10px 20px 0;background:#fff8e1;border:1px solid #f0c060;border-radius:var(--rs);padding:9px 13px;display:none;align-items:center;gap:8px;}
+.expiry-alert-text{font-size:12px;color:#7a4a08;flex:1;}
+.expiry-alert-link{background:none;border:none;font-size:11px;color:#7a4a08;font-weight:600;cursor:pointer;text-decoration:underline;white-space:nowrap;}
 /* PRIVACIDAD */
 .privacy-group{margin:14px 0 10px;display:flex;flex-direction:column;gap:10px;}
 .privacy-item{display:flex;align-items:flex-start;gap:9px;cursor:pointer;}
@@ -357,7 +369,7 @@ input:checked+.togslider:before{transform:translateX(16px);}
     <div class="swrap">
       <div class="sbox">
         <span class="sicon">⌕</span>
-        <input class="sinput" id="si" type="text" placeholder="Nombre, teléfono o mascota..." autocomplete="off" oninput="filterClients(this.value)"/>
+        <input class="sinput" id="si" type="text" placeholder="Nombre, teléfono o mascota..." autocomplete="off" oninput="filterClients()"/>
       </div>
     </div>
     <div class="legend">
@@ -365,8 +377,44 @@ input:checked+.togslider:before{transform:translateX(16px);}
       <div class="litem"><div class="ldot" style="background:var(--am)"></div>Cumpleaños</div>
       <div class="litem"><div class="ldot" style="background:var(--pu)"></div>Campaña</div>
     </div>
-    <div class="inv-prep-wrap">
-      <button class="inv-prep-btn" id="inv-prep-btn" onclick="prepareInvites()">📋 Preparar invitaciones del día</button>
+    <!-- Chips de filtro -->
+    <div class="chips-row">
+      <button class="chip" data-filter="birthday" data-cls="on-amber" onclick="toggleChip('birthday')">🎂 Cumpleaños</button>
+      <button class="chip" data-filter="coupon"   data-cls="on-purple" onclick="toggleChip('coupon')">🎁 Cupón sin usar</button>
+      <button class="chip" data-filter="new"      data-cls="on"        onclick="toggleChip('new')">✨ Nuevos</button>
+      <button class="chip" data-filter="dog"      data-cls="on"        onclick="toggleChip('dog')">🐶 Perros</button>
+      <button class="chip" data-filter="cat"      data-cls="on"        onclick="toggleChip('cat')">🐱 Gatos</button>
+      <button class="chip" data-filter="other"    data-cls="on"        onclick="toggleChip('other')">🐾 Otros</button>
+      <button class="chip" data-filter="clinic"   data-cls="on"        onclick="toggleChip('clinic')">💊 Clínica</button>
+      <button class="chip" data-filter="shop"     data-cls="on"        onclick="toggleChip('shop')">🛒 Tienda</button>
+      <button class="chip" data-filter="grooming" data-cls="on"        onclick="toggleChip('grooming')">✂️ Peluquería</button>
+      <button class="chip" data-filter="consent"  data-cls="on"        onclick="toggleChip('consent')">✅ Comunicaciones</button>
+    </div>
+    <!-- Barra de filtro activo -->
+    <div class="filter-bar" id="filter-bar">
+      <span class="filter-count" id="filter-count"></span>
+      <div class="filter-bar-right">
+        <select class="sort-sel" onchange="setSort(this.value)">
+          <option value="default">Orden: recientes</option>
+          <option value="name">Orden: A-Z</option>
+          <option value="birthday">Orden: cumpleaños</option>
+        </select>
+        <button class="filter-clear" onclick="clearFilters()">Limpiar</button>
+      </div>
+    </div>
+    <!-- Alerta cupones caducando -->
+    <div class="expiry-alert" id="expiry-alert">
+      <span class="expiry-alert-text" id="expiry-alert-text"></span>
+      <button class="expiry-alert-link" onclick="activateExpiryFilter()">Ver →</button>
+    </div>
+    <!-- Mensaje grupal -->
+    <div class="group-msg-wrap" id="group-msg-wrap">
+      <button class="group-msg-btn" onclick="toggleGroupMsg()"><span id="group-msg-btn-text">💬 Mensaje grupal</span></button>
+      <div class="group-msg-panel" id="group-msg-panel">
+        <div class="group-msg-vars">Variables: <code>[NOMBRE]</code></div>
+        <textarea class="group-msg-tpl" id="group-msg-tpl" rows="4" oninput="this._userEdited=true"></textarea>
+        <div class="wa-list" id="group-msg-list"></div>
+      </div>
     </div>
     <div class="rlist" id="rl">
       <div class="loading-state"><div class="spinner"></div>Cargando miembros...</div>
@@ -914,7 +962,6 @@ function showApp() {
   document.getElementById("app").style.display          = "block";
   document.getElementById("fab").style.display          = "flex";
   loadAll();
-  startInvitePolling();
 }
 window.addEventListener("DOMContentLoaded", () => {
   if (sessionStorage.getItem(SESSION_KEY) === "1") showApp();
@@ -939,6 +986,7 @@ async function loadAll() {
     renderBenefitTemplates();
     renderDiscoveryCoupons();
     document.getElementById("mc").textContent = clients.length + " miembro" + (clients.length !== 1 ? "s" : "");
+    checkExpiringCoupons();
   } catch(e) {
     document.getElementById("rl").innerHTML = `<div class="empty-state"><div class="empty-icon">⚠️</div><div class="empty-text">Error al conectar con Supabase.<br>${e.message}</div></div>`;
   }
@@ -970,11 +1018,12 @@ function renderList(list) {
     const petNames     = c.pets.map(p => p.name).join(", ") || "—";
     const active   = (c.benefits||[]).filter(b => b.status === "active" && b.dot !== "campaign").length;
     const campaign = (c.benefits||[]).filter(b => b.dot === "campaign"  && b.status === "active").length;
+    const speciesIcon = firstSpecies === "Perro" ? "🐶" : firstSpecies === "Gato" ? "🐱" : firstSpecies ? "🐾" : "";
     return `<div class="cc" onclick="openProfile('${c.id}')">
       <div class="av ${avc(firstSpecies)}">${ini(c.name)}</div>
       <div class="ci">
         <div class="cn">${c.name}</div>
-        <div class="cs">${petNames} · ${c.phone}</div>
+        <div class="cs">${speciesIcon ? speciesIcon + " " : ""}${petNames} · ${c.phone}</div>
         <div class="cbs">
           ${active   > 0 ? `<span class="badge active">${active} activo${active > 1 ? "s" : ""}</span>` : ""}
           ${campaign > 0 ? `<span class="badge campaign">${campaign} campaña${campaign > 1 ? "s" : ""}</span>` : ""}
@@ -985,15 +1034,7 @@ function renderList(list) {
   }).join("");
 }
 
-function filterClients(q) {
-  const v = q.toLowerCase().trim();
-  filtered = !v ? [...clients] : clients.filter(c =>
-    c.name.toLowerCase().includes(v) ||
-    (c.phone||"").toString().replace(/\s/g,"").includes(v.replace(/\s/g,"")) ||
-    c.pets.some(p => (p.name||"").toLowerCase().includes(v))
-  );
-  renderList(filtered);
-}
+function filterClients() { applyFilters(); }
 
 // ── PERFIL DE CLIENTE ─────────────────────────────────────
 function openProfile(id) {
@@ -1061,7 +1102,7 @@ function renderBenefitsProfile(c) {
   document.getElementById("pb").innerHTML = (c.benefits||[]).map((b, i) => {
     const expTag = b.expiry ? `<div class="bexpiry">Hasta ${b.expiry}</div>` : "";
     const action = b.status === "active"
-      ? `<button class="cbtn" onclick="canjear(${i})">Canjear</button>`
+      ? `<button class="cbtn" onclick="canjear(${i})">Canjear</button><button class="remind-btn" onclick="sendReminder(${i})" title="Enviar recordatorio por WhatsApp">📨</button>`
       : b.status === "used" ? '<span class="utag">Canjeado</span>'
       : '<span class="atag">Siempre activo</span>';
     return `<div class="bi ${b.status}">
@@ -1296,16 +1337,6 @@ async function addClient() {
     renderList(filtered);
     closeModal("modal-client");
     showToast(name + " añadido/a ✓");
-    // Marcar invitación Wakyma como registrada si viene del flujo de invitaciones
-    if (window._currentInviteId) {
-      const inv = _activeInvites.find(i => i.id === window._currentInviteId);
-      if (inv) {
-        sb("PATCH", "wk_invites", { filter: "id=eq." + inv.id, body: { status: "registered" } }).catch(() => {});
-        _activeInvites = _activeInvites.filter(i => i.id !== window._currentInviteId);
-        renderInviteBar(_activeInvites);
-      }
-      window._currentInviteId = null;
-    }
     // Reset
     document.getElementById("check-privacy").checked   = false;
     document.getElementById("check-marketing").checked = false;
@@ -1924,110 +1955,181 @@ function addConditionWithValue(field, value) {
   }
 }
 
-// ── INVITACIONES WAKYMA ────────────────────────────────────
-let _inviteTimer    = null;
-let _activeInvites  = [];
-window._currentInviteId = null;
+// ── FILTROS Y MENSAJES ────────────────────────────────────
+let activeFilters = new Set();
+let sortMode      = "default";
 
-function startInvitePolling() {
-  pollWkInvites();
-  if (_inviteTimer) clearInterval(_inviteTimer);
-  _inviteTimer = setInterval(pollWkInvites, 120000); // cada 2 min
+function toggleChip(key) {
+  activeFilters.has(key) ? activeFilters.delete(key) : activeFilters.add(key);
+  applyFilters();
 }
 
-async function pollWkInvites() {
-  try {
-    // Cargar invitaciones pendientes desde Supabase
-    const invites = await sb("GET", "wk_invites", { filter: "status=eq.pending" });
-    if (!invites || !invites.length) { renderInviteBar([]); return; }
+function clearFilters() {
+  activeFilters.clear();
+  document.getElementById("si").value = "";
+  sortMode = "default";
+  document.querySelector(".sort-sel").value = "default";
+  applyFilters();
+}
 
-    // Para cada una, comprobar estado del recordatorio en Wakyma
-    const completed = [];
-    for (const inv of invites) {
-      try {
-        const remRes = await wk("/api/v3/reminders/" + inv.wk_reminder_id);
-        const state  = remRes.state !== undefined ? remRes.state
-                     : (remRes.data  !== undefined ? remRes.data.state : undefined);
-        if (state === 1) completed.push(inv); // 1 = completado
-      } catch(e) { /* ignorar errores individuales */ }
+function setSort(mode) { sortMode = mode; applyFilters(); }
+
+function isNewThisMonth(c) {
+  const now = new Date();
+  const ms  = ["ene","feb","mar","abr","may","jun","jul","ago","sep","oct","nov","dic"];
+  const s   = (c.since||"").toLowerCase();
+  return s.includes(ms[now.getMonth()]) && s.includes(String(now.getFullYear()));
+}
+
+function hasUnusedCoupon(c) {
+  return (c.benefits||[]).some(b => b.status === "active");
+}
+
+function nextBirthdayDays(c) {
+  const pet = (c.pets||[]).find(p => p.pet_bday);
+  if (!pet || !pet.pet_bday) return 9999;
+  const now   = new Date();
+  const parts = pet.pet_bday.split("-");
+  if (parts.length < 3) return 9999;
+  const next  = new Date(now.getFullYear(), parseInt(parts[1])-1, parseInt(parts[2]));
+  if (next < now) next.setFullYear(now.getFullYear() + 1);
+  return Math.floor((next - now) / 86400000);
+}
+
+function applyFilters() {
+  const q = (document.getElementById("si")?.value || "").toLowerCase().trim();
+  let list = [...clients];
+
+  if (q) list = list.filter(c =>
+    c.name.toLowerCase().includes(q) ||
+    (c.phone||"").replace(/\s/g,"").includes(q.replace(/\s/g,"")) ||
+    c.pets.some(p => (p.name||"").toLowerCase().includes(q))
+  );
+
+  if (activeFilters.has("birthday")) list = list.filter(c => c.birthdayWeek);
+  if (activeFilters.has("coupon"))   list = list.filter(c => hasUnusedCoupon(c));
+  if (activeFilters.has("new"))      list = list.filter(c => isNewThisMonth(c));
+  if (activeFilters.has("dog"))      list = list.filter(c => c.pets.some(p => p.species === "Perro"));
+  if (activeFilters.has("cat"))      list = list.filter(c => c.pets.some(p => p.species === "Gato"));
+  if (activeFilters.has("other"))    list = list.filter(c => c.pets.some(p => p.species !== "Perro" && p.species !== "Gato"));
+  if (activeFilters.has("clinic"))   list = list.filter(c => c.svcArray.includes("clinica"));
+  if (activeFilters.has("shop"))     list = list.filter(c => c.svcArray.includes("tienda"));
+  if (activeFilters.has("grooming")) list = list.filter(c => c.svcArray.includes("peluqueria"));
+  if (activeFilters.has("consent"))  list = list.filter(c => c.marketing_consent);
+
+  if (sortMode === "name")     list.sort((a,b) => a.name.localeCompare(b.name));
+  if (sortMode === "birthday") list.sort((a,b) => nextBirthdayDays(a) - nextBirthdayDays(b));
+
+  filtered = list;
+  renderList(filtered);
+  updateChipStates();
+  updateFilterBar();
+  updateGroupMsgPanel();
+}
+
+function updateChipStates() {
+  document.querySelectorAll(".chip[data-filter]").forEach(el => {
+    const cls = el.dataset.cls || "on";
+    el.classList.toggle(cls, activeFilters.has(el.dataset.filter));
+  });
+}
+
+function updateFilterBar() {
+  const fb = document.getElementById("filter-bar");
+  if (!fb) return;
+  const active = activeFilters.size > 0 || (document.getElementById("si")?.value||"").trim();
+  fb.style.display = active ? "flex" : "none";
+  if (active) document.getElementById("filter-count").innerHTML =
+    `<strong>${filtered.length}</strong> de ${clients.length} miembro${clients.length !== 1 ? "s" : ""}`;
+}
+
+function updateGroupMsgPanel() {
+  const wrap = document.getElementById("group-msg-wrap");
+  if (!wrap) return;
+  if (filtered.length > 0 && activeFilters.size > 0) {
+    wrap.style.display = "block";
+    document.getElementById("group-msg-btn-text").textContent =
+      `💬 Mensaje a ${filtered.length} miembro${filtered.length !== 1 ? "s" : ""}`;
+    const tpl = document.getElementById("group-msg-tpl");
+    if (!tpl._userEdited) {
+      if (activeFilters.has("birthday"))
+        tpl.value = "Hola [NOMBRE] 🎂 Esta semana es el cumpleaños de tu peque. ¡Felicidades desde Canexion! Acércate cuando quieras.";
+      else if (activeFilters.has("coupon"))
+        tpl.value = "Hola [NOMBRE], te recordamos que tienes un beneficio disponible en Familia Canexion que aún no has usado. ¡No dejes que caduque!";
+      else
+        tpl.value = "Hola [NOMBRE], desde Familia Canexion queremos enviarte un mensaje.";
     }
-    renderInviteBar(completed);
-  } catch(e) { /* ignorar errores de polling */ }
+  } else {
+    wrap.style.display = "none";
+    document.getElementById("group-msg-panel")?.classList.remove("open");
+  }
 }
 
-function renderInviteBar(invites) {
-  _activeInvites = invites;
-  let bar = document.getElementById("invite-bar");
-  if (!bar) {
-    bar = document.createElement("div");
-    bar.id        = "invite-bar";
-    bar.className = "invite-bar";
-    document.body.appendChild(bar);
-  }
-  if (!invites.length) { bar.style.display = "none"; return; }
-  bar.style.display = "block";
-  bar.innerHTML = `
-    <div class="invite-bar-inner">
-      <div class="invite-bar-header">
-        <span class="invite-bar-title">⚡ Quieren unirse a Familia Canexion</span>
-      </div>
-      ${invites.map(inv => `
-      <div class="invite-item" id="invite-row-${inv.id}">
-        <div class="invite-info">
-          <div class="invite-name">${inv.client_name || "Cliente sin nombre"}</div>
-          <div class="invite-phone">${inv.client_phone || ""}</div>
-        </div>
-        <button class="invite-add-btn" onclick="registerFromInvite(${inv.id})">Añadir →</button>
-        <button class="invite-dec-btn" onclick="declineInvite(${inv.id})" title="Descartar">✕</button>
-      </div>`).join("")}
+function toggleGroupMsg() {
+  const panel = document.getElementById("group-msg-panel");
+  panel.classList.toggle("open");
+  if (panel.classList.contains("open")) buildGroupMsgLinks();
+}
+
+function buildGroupMsgLinks() {
+  const tpl  = document.getElementById("group-msg-tpl").value;
+  const list = document.getElementById("group-msg-list");
+  list.innerHTML = filtered.map(c => {
+    const phone = (c.phone||"").replace(/\D/g,"");
+    const fp    = phone.startsWith("34") ? phone : "34"+phone;
+    const msg   = encodeURIComponent(tpl.replace(/\[NOMBRE\]/g, c.name.split(" ")[0]));
+    return `<div class="wa-item">
+      <div class="wa-info"><div class="wa-name">${c.name}</div><div class="wa-phone">${c.phone}</div></div>
+      <a class="wa-btn" href="https://wa.me/${fp}?text=${msg}" target="_blank">WhatsApp</a>
     </div>`;
+  }).join("");
 }
 
-async function registerFromInvite(inviteId) {
-  const inv = _activeInvites.find(i => i.id === inviteId);
-  if (!inv) return;
-  window._currentInviteId = inviteId;
-  openNewClientModal();
-  // Esperar a que el modal esté renderizado y pre-rellenar teléfono
-  await new Promise(r => setTimeout(r, 120));
-  const phoneEl = document.getElementById("fph-wk");
-  if (phoneEl && inv.client_phone) {
-    phoneEl.value = inv.client_phone;
-    searchWakyma();
-  }
+function sendReminder(i) {
+  const b     = current.benefits[i];
+  const phone = (current.phone||"").replace(/\D/g,"");
+  const fp    = phone.startsWith("34") ? phone : "34"+phone;
+  const name  = current.name.split(" ")[0];
+  const exp   = b.expiry ? `, válido hasta ${b.expiry}` : "";
+  const msg   = encodeURIComponent(`Hola ${name} 👋 Te recordamos que tienes disponible "${b.name}" en Familia Canexion${exp}. ¡No lo dejes sin usar!`);
+  window.open(`https://wa.me/${fp}?text=${msg}`, "_blank");
 }
 
-async function declineInvite(inviteId) {
-  const inv = _activeInvites.find(i => i.id === inviteId);
-  if (!inv) return;
-  try {
-    await sb("PATCH", "wk_invites", { filter: "id=eq." + inv.id, body: { status: "declined" } });
-  } catch(e) { /* ignorar */ }
-  _activeInvites = _activeInvites.filter(i => i.id !== inviteId);
-  renderInviteBar(_activeInvites);
+function parseExpiry(s) {
+  if (!s) return null;
+  if (/^\d{4}-\d{2}-\d{2}/.test(s)) return new Date(s);
+  const ms = {ene:0,feb:1,mar:2,abr:3,may:4,jun:5,jul:6,ago:7,sep:8,oct:9,nov:10,dic:11};
+  const m  = s.match(/(\d+)\s+(\w+)\s+(\d+)/);
+  if (m) return new Date(parseInt(m[3]), ms[m[2].toLowerCase()], parseInt(m[1]));
+  return null;
 }
 
-async function prepareInvites() {
-  const btn = document.getElementById("inv-prep-btn");
-  btn.disabled    = true;
-  btn.textContent = "Preparando...";
-  try {
-    const r    = await fetch("/.netlify/functions/wk-morning-invites", { method: "POST" });
-    const data = await r.json();
-    if (data.success) {
-      const n = data.created;
-      showToast(n === 0
-        ? (data.message || "Sin clientes nuevos para mañana")
-        : `${n} recordatorio${n !== 1 ? "s" : ""} creado${n !== 1 ? "s" : ""} en Wakyma ✓`);
-      pollWkInvites();
-    } else {
-      showToast("Error: " + (data.error || "desconocido"), true);
+function checkExpiringCoupons() {
+  const now  = new Date();
+  const in7  = new Date(now.getTime() + 7 * 86400000);
+  let count  = 0;
+  for (const c of clients) {
+    for (const b of (c.benefits||[])) {
+      if (b.status !== "active" || !b.expiry) continue;
+      const d = parseExpiry(b.expiry);
+      if (d && d >= now && d <= in7) count++;
     }
-  } catch(e) {
-    showToast("Error al preparar invitaciones: " + e.message, true);
   }
-  btn.disabled    = false;
-  btn.textContent = "📋 Preparar invitaciones del día";
+  const bar = document.getElementById("expiry-alert");
+  if (!bar) return;
+  if (count > 0) {
+    bar.style.display = "flex";
+    document.getElementById("expiry-alert-text").textContent =
+      `⚠ ${count} cupón${count > 1 ? "es" : ""} caduca${count > 1 ? "n" : ""} esta semana`;
+  } else {
+    bar.style.display = "none";
+  }
+}
+
+function activateExpiryFilter() {
+  activeFilters.clear();
+  activeFilters.add("coupon");
+  applyFilters();
 }
 
 // ── MODALES ───────────────────────────────────────────────
