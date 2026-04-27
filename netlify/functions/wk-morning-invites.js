@@ -3,7 +3,7 @@ const SUPABASE_URL = "https://lhvaonkibrfujdbbhkkr.supabase.co";
 const SUPABASE_KEY = "sb_publishable_wwY0Zcd-sxz5Gqr_NJ7zhg_5OkSiCU0";
 
 async function wakyma(endpoint, opts = {}) {
-  const r = await fetch("https://api.wakyma.com" + endpoint, {
+  const r = await fetch("https://vets.wakyma.com" + endpoint, {
     method: opts.method || "GET",
     headers: {
       "Authorization": "Bearer " + WAKYMA_KEY,

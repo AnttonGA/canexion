@@ -24,7 +24,7 @@ exports.handler = async (event) => {
   }
 
   try {
-    const r = await fetch("https://api.wakyma.com" + endpoint, {
+    const r = await fetch("https://vets.wakyma.com" + endpoint, {
       headers: { "Authorization": "Bearer " + WAKYMA_KEY }
     });
     const text = await r.text();
