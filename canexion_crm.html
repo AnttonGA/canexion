@@ -135,8 +135,11 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--tp);min-h
 .new-camp-btn{background:var(--gm);border:none;border-radius:20px;padding:7px 14px;font-family:'DM Sans',sans-serif;font-size:12px;font-weight:500;color:white;cursor:pointer;white-space:nowrap;}
 .new-camp-btn:hover{background:var(--gd);}
 .camp-card{background:var(--sf);border:1px solid var(--bd);border-radius:var(--r);padding:14px 16px;}
+.camp-card-header{display:flex;align-items:flex-start;justify-content:space-between;gap:8px;}
 .camp-name{font-size:14px;font-weight:500;color:var(--tp);}
 .camp-desc{font-size:12px;color:var(--ts);margin-top:2px;}
+.camp-del-btn{background:none;border:none;cursor:pointer;font-size:15px;color:var(--tm);padding:0 2px;line-height:1;flex-shrink:0;transition:color .15s;}
+.camp-del-btn:hover{color:#c0392b;}
 .camp-meta{display:flex;gap:8px;margin-top:8px;flex-wrap:wrap;}
 .camp-tag{font-size:11px;padding:2px 8px;border-radius:20px;background:var(--gg);color:var(--gm);}
 .camp-tag.expiry{background:var(--ap);color:#9a6010;}
@@ -1358,9 +1361,15 @@ function renderCampaigns() {
   el.innerHTML = campaigns.map(c => {
     const conds = (c.conditions||[]).length;
     const rc    = c.recipient_count || 0;
+    const esc   = (c.name||"").replace(/'/g, "\\'");
     return `<div class="camp-card">
-      <div class="camp-name">${c.name}</div>
-      <div class="camp-desc">${c.description || ""}</div>
+      <div class="camp-card-header">
+        <div>
+          <div class="camp-name">${c.name}</div>
+          <div class="camp-desc">${c.description || ""}</div>
+        </div>
+        <button class="camp-del-btn" title="Borrar campaña" onclick="deleteCampaign('${c.id}','${esc}')">🗑</button>
+      </div>
       <div class="camp-meta">
         <span class="camp-tag">${c.discount}</span>
         ${c.expiry ? `<span class="camp-tag expiry">Hasta ${c.expiry}</span>` : ""}
@@ -1371,6 +1380,16 @@ function renderCampaigns() {
       </div>
     </div>`;
   }).join("");
+}
+
+async function deleteCampaign(id, name) {
+  if (!confirm(`¿Borrar la campaña "${name}"?\n\nEsto elimina el registro de la campaña, pero los cupones ya asignados a los miembros se mantienen.`)) return;
+  try {
+    await sb("DELETE", "campaigns", { filter: "id=eq." + id });
+    campaigns = campaigns.filter(c => String(c.id) !== String(id));
+    renderCampaigns();
+    showToast("Campaña eliminada ✓");
+  } catch(e) { showToast("Error al borrar: " + e.message, true); }
 }
 
 function openCampModal() {
