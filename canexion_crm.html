@@ -1104,8 +1104,9 @@ function openProfile(id) {
 function renderBenefitsProfile(c) {
   document.getElementById("pb").innerHTML = (c.benefits||[]).map((b, i) => {
     const expTag = b.expiry ? `<div class="bexpiry">Hasta ${b.expiry}</div>` : "";
+    const isAlways = b.dot === "always" || b.status === "always";
     const action = b.status === "active"
-      ? `<button class="cbtn" onclick="canjear(${i})">Canjear</button><button class="remind-btn" onclick="sendReminder(${i})" title="Enviar recordatorio por WhatsApp">📨</button>`
+      ? `<button class="cbtn" onclick="canjear(${i})">Canjear</button>${!isAlways ? `<button class="remind-btn" onclick="sendReminder(${i})" title="Enviar recordatorio por WhatsApp">📨</button>` : ""}`
       : b.status === "used" ? '<span class="utag">Canjeado</span>'
       : '<span class="atag">Siempre activo</span>';
     return `<div class="bi ${b.status}">
@@ -1573,7 +1574,7 @@ async function launchCampaign() {
     const recipientCount = previewedClients.length;
     await sb("POST", "campaigns", { body: {
       name:            campCoupon.name,
-      description:     campCoupon.name,
+      description:     campCoupon.desc,
       discount:        campCoupon.desc,
       expiry:          campCoupon.expiry || null,
       conditions:      getConditions(),
@@ -2027,6 +2028,13 @@ function applyFilters() {
 
   if (activeFilters.has("birthday")) list = list.filter(c => c.birthdayWeek);
   if (activeFilters.has("coupon"))   list = list.filter(c => hasUnusedCoupon(c));
+  if (activeFilters.has("expiry"))   list = list.filter(c => {
+    const now = new Date(), in7 = new Date(now.getTime() + 7 * 86400000);
+    return (c.benefits||[]).some(b => {
+      if (b.status !== "active" || !b.expiry) return false;
+      const d = parseExpiry(b.expiry); return d && d >= now && d <= in7;
+    });
+  });
   if (activeFilters.has("new"))      list = list.filter(c => isNewThisMonth(c));
   if (activeFilters.has("dog"))      list = list.filter(c => c.pets.some(p => p.species === "Perro"));
   if (activeFilters.has("cat"))      list = list.filter(c => c.pets.some(p => p.species === "Gato"));
@@ -2065,14 +2073,29 @@ function updateFilterBar() {
 function updateGroupMsgPanel() {
   const wrap = document.getElementById("group-msg-wrap");
   if (!wrap) return;
+  const withConsent = filtered.filter(c => c.marketing_consent);
   if (filtered.length > 0 && activeFilters.size > 0) {
     wrap.style.display = "block";
+    const excluded = filtered.length - withConsent.length;
     document.getElementById("group-msg-btn-text").textContent =
-      `💬 Mensaje a ${filtered.length} miembro${filtered.length !== 1 ? "s" : ""}`;
+      `💬 Mensaje a ${withConsent.length} miembro${withConsent.length !== 1 ? "s" : ""}`;
+    // Aviso de excluidos por consentimiento
+    let note = document.getElementById("group-msg-consent-note");
+    if (!note) {
+      note = document.createElement("div");
+      note.id = "group-msg-consent-note";
+      note.style.cssText = "font-size:11px;color:var(--tm);margin-top:5px;padding:0 4px;";
+      wrap.appendChild(note);
+    }
+    note.textContent = excluded > 0
+      ? `${excluded} miembro${excluded > 1 ? "s" : ""} excluido${excluded > 1 ? "s" : ""} por falta de consentimiento`
+      : "";
     const tpl = document.getElementById("group-msg-tpl");
     if (!tpl._userEdited) {
       if (activeFilters.has("birthday"))
         tpl.value = "Hola [NOMBRE] 🎂 Esta semana es el cumpleaños de tu peque. ¡Felicidades desde Canexion! Acércate cuando quieras.";
+      else if (activeFilters.has("expiry"))
+        tpl.value = "Hola [NOMBRE] ⏰ Tienes un cupón en Familia Canexion que caduca muy pronto. ¡No dejes que se pierda!";
       else if (activeFilters.has("coupon"))
         tpl.value = "Hola [NOMBRE], te recordamos que tienes un beneficio disponible en Familia Canexion que aún no has usado. ¡No dejes que caduque!";
       else
@@ -2091,9 +2114,14 @@ function toggleGroupMsg() {
 }
 
 function buildGroupMsgLinks() {
-  const tpl  = document.getElementById("group-msg-tpl").value;
-  const list = document.getElementById("group-msg-list");
-  list.innerHTML = filtered.map(c => {
+  const tpl       = document.getElementById("group-msg-tpl").value;
+  const list      = document.getElementById("group-msg-list");
+  const recipients = filtered.filter(c => c.marketing_consent);
+  if (!recipients.length) {
+    list.innerHTML = `<div style="font-size:12px;color:var(--tm);padding:10px 4px;">Ningún miembro de esta selección ha dado consentimiento para recibir comunicaciones.</div>`;
+    return;
+  }
+  list.innerHTML = recipients.map(c => {
     const phone = (c.phone||"").replace(/\D/g,"");
     const fp    = phone.startsWith("34") ? phone : "34"+phone;
     const msg   = encodeURIComponent(tpl.replace(/\[NOMBRE\]/g, c.name.split(" ")[0]));
@@ -2147,7 +2175,7 @@ function checkExpiringCoupons() {
 
 function activateExpiryFilter() {
   activeFilters.clear();
-  activeFilters.add("coupon");
+  activeFilters.add("expiry");
   applyFilters();
 }
 
