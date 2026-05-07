@@ -576,6 +576,10 @@ input:checked+.togslider:before{transform:translateX(16px);}
         <input type="checkbox" id="check-marketing"/>
         <span>Acepto recibir comunicaciones comerciales y promociones de Canexion (opcional).</span>
       </label>
+      <label class="privacy-item">
+        <input type="checkbox" id="check-photos"/>
+        <span>Autorizo el uso de imágenes de mis mascotas captadas en la clínica, tienda o eventos de Canexion en redes sociales y web (opcional).</span>
+      </label>
     </div>
     <button class="subbtn" id="sbtn-client" onclick="addClient()">Dar de alta</button>
     <span class="cancelink" onclick="closeModal('modal-client')">Cancelar</span>
@@ -910,7 +914,8 @@ function mapClient(c) {
     birthdayWeek:      birthdayPets.length > 0,
     birthdayPets:      birthdayPets,
     petAge:            pets.length > 0 ? getPetAge(pets[0].pet_bday) : null,
-    marketing_consent: c.marketing_consent === true
+    marketing_consent: c.marketing_consent === true,
+    photo_consent:     c.photo_consent === true
   };
 }
 
@@ -1073,10 +1078,15 @@ function openProfile(id) {
   // Código postal
   document.getElementById("pcp").textContent = c.postal_code || "—";
 
-  // Consentimiento comunicaciones
-  document.getElementById("p-consent").innerHTML = c.marketing_consent
-    ? '<span class="consent-badge yes">✓ Acepta comunicaciones comerciales</span>'
-    : '<span class="consent-badge no">✕ No acepta comunicaciones comerciales</span>';
+  // Consentimientos
+  document.getElementById("p-consent").innerHTML =
+    (c.marketing_consent
+      ? '<span class="consent-badge yes">✓ Comunicaciones comerciales</span>'
+      : '<span class="consent-badge no">✕ Sin comunicaciones</span>') +
+    " " +
+    (c.photo_consent
+      ? '<span class="consent-badge yes">📷 Autoriza fotos</span>'
+      : '<span class="consent-badge no">📷 Sin fotos</span>');
 
   document.getElementById("pno").value = c.notes || "";
 
@@ -1313,6 +1323,7 @@ async function addClient() {
     showToast("Debes aceptar la política de privacidad para continuar", true); return;
   }
   const marketingConsent = document.getElementById("check-marketing").checked;
+  const photoConsent     = document.getElementById("check-photos").checked;
 
   const btn = document.getElementById("sbtn-client");
   btn.disabled = true; btn.textContent = "Guardando...";
@@ -1333,6 +1344,7 @@ async function addClient() {
       pet_bday:    pets[0].pet_bday || null,
       svc:               JSON.stringify(svcArray),
       marketing_consent: marketingConsent,
+      photo_consent:     photoConsent,
       notes: "", benefits
     }});
     const mapped = mapClient(result[0]);
@@ -1344,6 +1356,7 @@ async function addClient() {
     // Reset
     document.getElementById("check-privacy").checked   = false;
     document.getElementById("check-marketing").checked = false;
+    document.getElementById("check-photos").checked    = false;
     ["fn","fph","fe","fcp"].forEach(id => document.getElementById(id).value = "");
     document.getElementById("fpetcount").value = "1";
     renderModalPetForms(1);

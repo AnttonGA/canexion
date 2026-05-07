@@ -190,6 +190,10 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--tp);min-h
           <input type="checkbox" id="check-marketing"/>
           <span>Acepto recibir comunicaciones comerciales y promociones de Canexion (opcional).</span>
         </label>
+        <label class="privacy-item">
+          <input type="checkbox" id="check-photos"/>
+          <span>Autorizo el uso de imágenes de mis mascotas captadas en la clínica, tienda o eventos de Canexion en redes sociales y web (opcional).</span>
+        </label>
         <div class="privacy-err" id="err-privacy">Debes aceptar la política de privacidad para continuar</div>
       </div>
 
@@ -484,6 +488,7 @@ async function submitForm() {
         pet_bday:    pets[0].pet_bday || null,
         svc:               JSON.stringify(svcArray),
         marketing_consent: document.getElementById("check-marketing").checked,
+        photo_consent:     document.getElementById("check-photos").checked,
         notes:             "",
         benefits
       })
