@@ -1127,7 +1127,7 @@ function openProfile(id) {
   document.getElementById("tb-profile").style.display = "flex";
   document.getElementById("main-nav").style.display   = "none";
   document.getElementById("fab").style.display        = "none";
-  ["ss","sc","sb"].forEach(id => document.getElementById(id).classList.remove("active"));
+  ["ss","sc","sb","sm"].forEach(id => document.getElementById(id).classList.remove("active"));
   document.getElementById("sp").classList.add("active");
   loadWakymaPanel(c.phone);
   window.scrollTo(0, 0);
@@ -2223,15 +2223,24 @@ const cpCache = {}; // cp → {lat,lng} | null
 async function geocodeCP(cp) {
   const key = cp.replace(/\s/g, "");
   if (key in cpCache) return cpCache[key];
-  try {
-    const r = await fetch(
-      `https://nominatim.openstreetmap.org/search?postalcode=${encodeURIComponent(key)}&countrycodes=es&format=json&limit=1`,
-      { headers: { "User-Agent": "FamiliaCanexion-CRM/1.0 contacto@canexion.es" } }
-    );
-    const d = await r.json();
-    cpCache[key] = d && d.length ? { lat: parseFloat(d[0].lat), lng: parseFloat(d[0].lon) } : null;
-  } catch(e) { cpCache[key] = null; }
-  return cpCache[key];
+  const headers = { "User-Agent": "FamiliaCanexion-CRM/1.0" };
+  const queries = [
+    `https://nominatim.openstreetmap.org/search?postalcode=${encodeURIComponent(key)}&countrycodes=es&format=json&limit=1`,
+    `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(key + ", Spain")}&format=json&limit=1&addressdetails=1`
+  ];
+  for (const url of queries) {
+    try {
+      const r = await fetch(url, { headers });
+      const d = await r.json();
+      if (d && d.length) {
+        cpCache[key] = { lat: parseFloat(d[0].lat), lng: parseFloat(d[0].lon) };
+        return cpCache[key];
+      }
+    } catch(e) {}
+    await new Promise(r => setTimeout(r, 400));
+  }
+  cpCache[key] = null;
+  return null;
 }
 
 function mapMarkerColor(c) {
@@ -2245,9 +2254,7 @@ function mapMarkerColor(c) {
 
 function openProfileFromMap(id) {
   if (_map) _map.closePopup();
-  switchTab("clients");
-  const c = clients.find(cl => cl.id === id);
-  if (c) setTimeout(() => openProfile(c), 50);
+  openProfile(id);
 }
 
 async function renderMap() {
@@ -2315,9 +2322,11 @@ async function renderMap() {
   withCP.forEach(c => { const cp = c.postal_code.trim(); cpCount[cp] = (cpCount[cp]||0)+1; });
   const topCPs = Object.entries(cpCount).sort((a,b)=>b[1]-a[1]).slice(0,3);
 
+  const failedGeo = withCP.length - bounds.length;
   statsEl.innerHTML =
     `<span class="map-stat">📍 <strong>${bounds.length}</strong> en mapa</span>` +
-    (noCP ? `<span class="map-stat" style="color:#9a6010;">⚠ ${noCP} sin CP</span>` : "") +
+    (noCP    ? `<span class="map-stat" style="color:#9a6010;">⚠ ${noCP} sin CP</span>` : "") +
+    (failedGeo ? `<span class="map-stat" style="color:#9a6010;">⚠ ${failedGeo} CP sin geocodificar</span>` : "") +
     topCPs.map(([cp,n]) => `<span class="map-stat">📮 ${cp}: <strong>${n}</strong></span>`).join("") +
     `<div class="map-legend">
       <span class="map-leg-item"><span class="map-leg-dot" style="background:#2d6a35;"></span>Miembro</span>
