@@ -5,6 +5,8 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Familia Canexion — CRM</title>
 <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <style>
 :root{--gd:#1a3a1f;--gm:#2d6a35;--gs:#4a9455;--gp:#c8e6cb;--gg:#f0f7f1;--am:#e8a020;--ap:#fef3dc;--tp:#1a2a1c;--ts:#4a6050;--tm:#8aaa90;--bd:#d4e8d8;--sf:#ffffff;--bg:#f5f8f5;--r:12px;--rs:8px;--pu:#5a3a9a;--pup:#ede8f4;}
 *{box-sizing:border-box;margin:0;padding:0;}
@@ -42,6 +44,14 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--tp);min-h
 
 /* SCREENS */
 .screen{display:none;}.screen.active{display:block;}
+#sm.active{display:flex;flex-direction:column;height:calc(100vh - 90px);}
+.map-stat-bar{flex-shrink:0;padding:9px 16px;display:flex;gap:14px;align-items:center;flex-wrap:wrap;background:var(--sf);border-bottom:1px solid var(--bd);}
+.map-stat{font-size:12px;color:var(--ts);}
+.map-stat strong{color:var(--tp);font-weight:500;}
+.map-legend{display:flex;gap:14px;margin-left:auto;flex-wrap:wrap;}
+.map-leg-item{display:flex;align-items:center;gap:5px;font-size:11px;color:var(--ts);}
+.map-leg-dot{width:10px;height:10px;border-radius:50%;flex-shrink:0;}
+#map-container{flex:1;min-height:0;}
 
 /* SEARCH / LIST */
 .swrap{padding:14px 20px 10px;}
@@ -365,6 +375,7 @@ input:checked+.togslider:before{transform:translateX(16px);}
     <div class="nav-tab active" id="tab-clients"  onclick="switchTab('clients')">Miembros</div>
     <div class="nav-tab"        id="tab-camps"    onclick="switchTab('camps')">Campañas</div>
     <div class="nav-tab"        id="tab-benefits" onclick="switchTab('benefits')">Beneficios</div>
+    <div class="nav-tab"        id="tab-map"      onclick="switchTab('map')">🗺 Mapa</div>
   </div>
 
   <!-- SCREEN: MIEMBROS -->
@@ -528,6 +539,15 @@ input:checked+.togslider:before{transform:translateX(16px);}
 
     </div>
   </div>
+
+  <!-- SCREEN: MAPA -->
+  <div id="sm" class="screen">
+    <div class="map-stat-bar" id="map-stats">
+      <span class="map-stat">Cargando mapa...</span>
+    </div>
+    <div id="map-container"></div>
+  </div>
+
 </div>
 
 <!-- FAB -->
@@ -1002,15 +1022,17 @@ async function loadAll() {
 
 // ── TABS ──────────────────────────────────────────────────
 function switchTab(tab) {
-  ["clients","camps","benefits"].forEach(t => {
+  ["clients","camps","benefits","map"].forEach(t => {
     document.getElementById("tab-" + t).classList.toggle("active", t === tab);
   });
   document.getElementById("ss").classList.toggle("active", tab === "clients");
   document.getElementById("sc").classList.toggle("active", tab === "camps");
   document.getElementById("sb").classList.toggle("active", tab === "benefits");
+  document.getElementById("sm").classList.toggle("active", tab === "map");
   document.getElementById("fab").style.display = tab === "clients" ? "flex" : "none";
-  const titles = { clients: "Panel de fidelización", camps: "Campañas", benefits: "Beneficios" };
+  const titles = { clients: "Panel de fidelización", camps: "Campañas", benefits: "Beneficios", map: "Mapa de miembros" };
   document.getElementById("tb-title").textContent = titles[tab];
+  if (tab === "map") renderMap();
 }
 
 // ── LISTA DE CLIENTES ─────────────────────────────────────
@@ -2065,6 +2087,7 @@ function applyFilters() {
   updateChipStates();
   updateFilterBar();
   updateGroupMsgPanel();
+  if (document.getElementById("tab-map")?.classList.contains("active")) renderMap();
 }
 
 function updateChipStates() {
@@ -2190,6 +2213,120 @@ function activateExpiryFilter() {
   activeFilters.clear();
   activeFilters.add("expiry");
   applyFilters();
+}
+
+// ── MAPA OPENSTREETMAP (Leaflet + Nominatim) ─────────────
+let _map = null;
+let _markersLayer = null;
+const cpCache = {}; // cp → {lat,lng} | null
+
+async function geocodeCP(cp) {
+  const key = cp.replace(/\s/g, "");
+  if (key in cpCache) return cpCache[key];
+  try {
+    const r = await fetch(
+      `https://nominatim.openstreetmap.org/search?postalcode=${encodeURIComponent(key)}&countrycodes=es&format=json&limit=1`,
+      { headers: { "User-Agent": "FamiliaCanexion-CRM/1.0 contacto@canexion.es" } }
+    );
+    const d = await r.json();
+    cpCache[key] = d && d.length ? { lat: parseFloat(d[0].lat), lng: parseFloat(d[0].lon) } : null;
+  } catch(e) { cpCache[key] = null; }
+  return cpCache[key];
+}
+
+function mapMarkerColor(c) {
+  const now = new Date(), in7 = new Date(now.getTime() + 7 * 86400000);
+  const b = c.benefits || [];
+  if (b.some(x => x.status === "active" && x.expiry && (() => { const d = parseExpiry(x.expiry); return d && d >= now && d <= in7; })())) return "#e67e22";
+  if (c.birthdayWeek) return "#e8a020";
+  if (b.some(x => x.dot === "campaign" && x.status === "active")) return "#5a3a9a";
+  return "#2d6a35";
+}
+
+function openProfileFromMap(id) {
+  if (_map) _map.closePopup();
+  switchTab("clients");
+  const c = clients.find(cl => cl.id === id);
+  if (c) setTimeout(() => openProfile(c), 50);
+}
+
+async function renderMap() {
+  if (!document.getElementById("map-container")) return;
+
+  // Inicializar mapa una sola vez
+  if (!_map) {
+    _map = L.map("map-container").setView([43.32, -1.98], 12);
+    L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+      attribution: '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
+      maxZoom: 19
+    }).addTo(_map);
+    _markersLayer = L.layerGroup().addTo(_map);
+  }
+
+  _markersLayer.clearLayers();
+
+  const withCP  = filtered.filter(c => c.postal_code && c.postal_code.trim());
+  const noCP    = filtered.length - withCP.length;
+
+  // Actualizar barra de stats con "geocodificando..."
+  const statsEl = document.getElementById("map-stats");
+  statsEl.innerHTML = `<span class="map-stat">🔍 Geocodificando ${withCP.length} miembros...</span>`;
+
+  // Geocodificar CPs nuevos respetando el rate limit de Nominatim (1 req/s)
+  const uniqueCPs = [...new Set(withCP.map(c => c.postal_code.trim()))].filter(cp => !(cp in cpCache));
+  for (const cp of uniqueCPs) {
+    await geocodeCP(cp);
+    await new Promise(r => setTimeout(r, 400));
+  }
+
+  // Colocar marcadores
+  const bounds = [];
+  for (const c of withCP) {
+    const coord = cpCache[c.postal_code.trim()];
+    if (!coord) continue;
+    // Jitter para que pins del mismo CP no se solapen
+    const lat = coord.lat + (Math.random() - 0.5) * 0.005;
+    const lng = coord.lng + (Math.random() - 0.5) * 0.005;
+    const color = mapMarkerColor(c);
+    const petStr = c.pets.map(p => p.name).join(", ") || "—";
+    const marker = L.circleMarker([lat, lng], {
+      radius: 9, fillColor: color, color: "#fff",
+      weight: 2, opacity: 1, fillOpacity: 0.88
+    });
+    marker.bindPopup(`
+      <div style="font-family:'DM Sans',sans-serif;min-width:170px;padding:2px 0;">
+        <div style="font-weight:500;font-size:14px;margin-bottom:4px;color:#1a2a1c;">${c.name}</div>
+        <div style="font-size:12px;color:#4a6050;margin-bottom:2px;">🐾 ${petStr}</div>
+        <div style="font-size:12px;color:#8aaa90;margin-bottom:8px;">📮 ${c.postal_code}</div>
+        <button onclick="openProfileFromMap('${c.id}')"
+          style="width:100%;background:#2d6a35;color:white;border:none;border-radius:6px;padding:7px 0;font-size:12px;font-weight:500;cursor:pointer;font-family:'DM Sans',sans-serif;">
+          Ver perfil →
+        </button>
+      </div>
+    `);
+    marker.addTo(_markersLayer);
+    bounds.push([lat, lng]);
+  }
+
+  if (bounds.length) _map.fitBounds(bounds, { padding: [40, 40], maxZoom: 15 });
+
+  // Estadísticas por CP
+  const cpCount = {};
+  withCP.forEach(c => { const cp = c.postal_code.trim(); cpCount[cp] = (cpCount[cp]||0)+1; });
+  const topCPs = Object.entries(cpCount).sort((a,b)=>b[1]-a[1]).slice(0,3);
+
+  statsEl.innerHTML =
+    `<span class="map-stat">📍 <strong>${bounds.length}</strong> en mapa</span>` +
+    (noCP ? `<span class="map-stat" style="color:#9a6010;">⚠ ${noCP} sin CP</span>` : "") +
+    topCPs.map(([cp,n]) => `<span class="map-stat">📮 ${cp}: <strong>${n}</strong></span>`).join("") +
+    `<div class="map-legend">
+      <span class="map-leg-item"><span class="map-leg-dot" style="background:#2d6a35;"></span>Miembro</span>
+      <span class="map-leg-item"><span class="map-leg-dot" style="background:#5a3a9a;"></span>Campaña activa</span>
+      <span class="map-leg-item"><span class="map-leg-dot" style="background:#e8a020;"></span>Cumpleaños</span>
+      <span class="map-leg-item"><span class="map-leg-dot" style="background:#e67e22;"></span>Caduca pronto</span>
+    </div>`;
+
+  setTimeout(() => _map && _map.invalidateSize(), 150);
 }
 
 // ── MODALES ───────────────────────────────────────────────
