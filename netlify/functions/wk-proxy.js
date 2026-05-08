@@ -14,11 +14,20 @@ exports.handler = async (event) => {
     };
   }
 
+  // Diagnóstico: clave no configurada
+  if (!WAKYMA_KEY) {
+    return {
+      statusCode: 500,
+      headers: { "Access-Control-Allow-Origin": "*", "Content-Type": "application/json" },
+      body: JSON.stringify({ success: false, error: "WAKYMA_KEY no configurada en variables de entorno de Netlify" })
+    };
+  }
+
   const endpoint = (event.queryStringParameters || {}).e || "";
   if (!endpoint.startsWith("/api/v3/")) {
     return {
       statusCode: 400,
-      headers: { "Access-Control-Allow-Origin": "*" },
+      headers: { "Access-Control-Allow-Origin": "*", "Content-Type": "application/json" },
       body: JSON.stringify({ success: false, error: "endpoint inválido" })
     };
   }
@@ -39,7 +48,7 @@ exports.handler = async (event) => {
   } catch (e) {
     return {
       statusCode: 500,
-      headers: { "Access-Control-Allow-Origin": "*" },
+      headers: { "Access-Control-Allow-Origin": "*", "Content-Type": "application/json" },
       body: JSON.stringify({ success: false, error: e.message })
     };
   }
