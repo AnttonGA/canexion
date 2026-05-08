@@ -73,6 +73,7 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--tp);min-h
 .badge.active{background:#e8f4ea;color:var(--gm);}
 .badge.birthday{background:var(--ap);color:#9a6010;}
 .badge.campaign{background:var(--pup);color:var(--pu);}
+.badge.wk{background:#e8f0fe;color:#1a56a0;}
 .empty-state{text-align:center;padding:48px 24px;color:var(--tm);}
 .empty-icon{font-size:32px;margin-bottom:12px;}.empty-text{font-size:14px;line-height:1.6;}
 .loading-state{text-align:center;padding:40px 24px;color:var(--tm);font-size:14px;}
@@ -1071,6 +1072,7 @@ function renderList(list) {
           ${active   > 0 ? `<span class="badge active">${active} activo${active > 1 ? "s" : ""}</span>` : ""}
           ${campaign > 0 ? `<span class="badge campaign">${campaign} campaña${campaign > 1 ? "s" : ""}</span>` : ""}
           ${c.birthdayWeek ? '<span class="badge birthday">🎂 Cumpleaños</span>' : ""}
+          ${c.wk_client_id ? '<span class="badge wk">⚡ Wakyma</span>' : ""}
         </div>
       </div>
     </div>`;
@@ -1090,7 +1092,11 @@ function openProfile(id) {
   document.getElementById("pav").className   = "avlg " + avc(firstSpecies);
   document.getElementById("pn").textContent  = c.name;
   document.getElementById("pph").textContent = c.phone;
-  document.getElementById("psi").textContent = "Miembro desde " + c.since;
+  document.getElementById("psi").innerHTML =
+    "Miembro desde " + c.since +
+    (c.wk_client_id
+      ? ' &nbsp;<span style="background:rgba(200,230,203,.15);border:1px solid rgba(200,230,203,.25);padding:2px 8px;border-radius:20px;font-size:10px;color:rgba(200,230,203,.75);">⚡ Wakyma vinculado</span>'
+      : ' &nbsp;<span style="opacity:.45;">· Sin vincular a Wakyma</span>');
 
   // Mascotas
   const svcMap = {clinica:"Clínica",tienda:"Tienda",peluqueria:"Peluquería"};

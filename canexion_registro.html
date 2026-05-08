@@ -94,6 +94,8 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--tp);min-h
 /* ERRORES */
 .field-error{font-size:12px;color:#8a2020;margin-top:4px;display:none;}
 .fi.error,.fsel.error{border-color:#d09090;}
+/* WAKYMA HINT */
+.wk-found-hint{display:none;margin-top:7px;background:#e8f4ea;border:1px solid #b8deba;border-radius:var(--rs);padding:9px 13px;font-size:13px;color:var(--gm);line-height:1.4;}
 /* PRIVACIDAD */
 .privacy-group{margin:18px 0 0;display:flex;flex-direction:column;gap:12px;}
 .privacy-item{display:flex;align-items:flex-start;gap:10px;cursor:pointer;}
@@ -135,8 +137,9 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--tp);min-h
       </div>
       <div class="fg">
         <label class="fl">Teléfono (WhatsApp) *</label>
-        <input class="fi" id="fph" type="tel" placeholder="6XX XXX XXX" autocomplete="tel"/>
+        <input class="fi" id="fph" type="tel" placeholder="6XX XXX XXX" autocomplete="tel" oninput="onPhoneInput()"/>
         <div class="field-error" id="err-fph">Por favor introduce tu teléfono</div>
+        <div class="wk-found-hint" id="wk-found-hint">✓ Te hemos reconocido como cliente de la clínica — tu historial y compras se vincularán automáticamente a tu tarjeta.</div>
       </div>
       <div class="fg">
         <label class="fl">Email (opcional)</label>
@@ -558,6 +561,30 @@ function formatSince() {
 }
 function openPolicy()  { document.getElementById("pol-overlay").classList.add("open"); }
 function closePolicy() { document.getElementById("pol-overlay").classList.remove("open"); }
+
+// ── DETECCIÓN EN TIEMPO REAL WAKYMA ───────────────────────
+let _wkPhoneTimer = null;
+function onPhoneInput() {
+  clearTimeout(_wkPhoneTimer);
+  const hint  = document.getElementById("wk-found-hint");
+  hint.style.display = "none";
+  const phone = document.getElementById("fph").value.trim().replace(/\s/g, "");
+  if (phone.length < 9) return;
+  _wkPhoneTimer = setTimeout(() => checkPhoneInWakyma(phone), 800);
+}
+
+async function checkPhoneInWakyma(phone) {
+  try {
+    const r = await fetch(
+      "/.netlify/functions/wk-proxy?e=" +
+      encodeURIComponent("/api/v3/clients?phone=" + encodeURIComponent(phone))
+    );
+    if (!r.ok) return;
+    const data = await r.json();
+    const list = Array.isArray(data) ? data : (data.data || []);
+    document.getElementById("wk-found-hint").style.display = list.length > 0 ? "block" : "none";
+  } catch(e) { /* silencioso — no interrumpir el flujo del usuario */ }
+}
 </script>
 </body>
 </html>
