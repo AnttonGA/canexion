@@ -74,6 +74,15 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--tp);min-h
 .badge.birthday{background:var(--ap);color:#9a6010;}
 .badge.campaign{background:var(--pup);color:var(--pu);}
 .badge.wk{background:#e8f0fe;color:#1a56a0;}
+.badge.eu{background:#f0e8ff;color:#5a3a9a;}
+.annivalert{margin:10px 20px 0;background:#f0e8ff;border:1px solid #c8b0f0;border-radius:var(--rs);padding:10px 14px;display:none;align-items:center;gap:10px;}
+/* IDIOMA MODAL */
+.lang-group{display:flex;gap:8px;margin-top:2px;}
+.lang-opt{flex:1;display:flex;align-items:center;justify-content:center;gap:7px;background:var(--bg);border:1px solid var(--bd);border-radius:var(--rs);padding:9px 10px;font-size:13px;color:var(--tp);cursor:pointer;transition:border-color .15s;}
+.lang-opt:has(input:checked){border-color:var(--pu);background:var(--pup);}
+.lang-opt input{display:none;}
+/* GRUPO MSG BILINGÜE */
+.lang-label{font-size:11px;font-weight:500;color:var(--ts);margin:8px 0 3px;display:block;}
 .empty-state{text-align:center;padding:48px 24px;color:var(--tm);}
 .empty-icon{font-size:32px;margin-bottom:12px;}.empty-text{font-size:14px;line-height:1.6;}
 .loading-state{text-align:center;padding:40px 24px;color:var(--tm);font-size:14px;}
@@ -394,7 +403,8 @@ input:checked+.togslider:before{transform:translateX(16px);}
     </div>
     <!-- Chips de filtro -->
     <div class="chips-row">
-      <button class="chip" data-filter="birthday" data-cls="on-amber" onclick="toggleChip('birthday')">🎂 Cumpleaños</button>
+      <button class="chip" data-filter="birthday"     data-cls="on-amber"  onclick="toggleChip('birthday')">🎂 Cumpleaños</button>
+      <button class="chip" data-filter="anniversary" data-cls="on-purple" onclick="toggleChip('anniversary')">🎉 Aniversario</button>
       <button class="chip" data-filter="coupon"   data-cls="on-purple" onclick="toggleChip('coupon')">🎁 Cupón sin usar</button>
       <button class="chip" data-filter="new"      data-cls="on"        onclick="toggleChip('new')">✨ Nuevos</button>
       <button class="chip" data-filter="dog"      data-cls="on"        onclick="toggleChip('dog')">🐶 Perros</button>
@@ -427,7 +437,10 @@ input:checked+.togslider:before{transform:translateX(16px);}
       <button class="group-msg-btn" onclick="toggleGroupMsg()"><span id="group-msg-btn-text">💬 Mensaje grupal</span></button>
       <div class="group-msg-panel" id="group-msg-panel">
         <div class="group-msg-vars">Variables: <code>[NOMBRE]</code></div>
-        <textarea class="group-msg-tpl" id="group-msg-tpl" rows="4" oninput="this._userEdited=true"></textarea>
+        <span class="lang-label">🇪🇸 Castellano</span>
+        <textarea class="group-msg-tpl" id="group-msg-tpl-es" rows="3" oninput="onGroupTplInput(this)"></textarea>
+        <span class="lang-label">🏔 Euskera <span style="font-weight:400;color:var(--tm)">(opcional)</span></span>
+        <textarea class="group-msg-tpl" id="group-msg-tpl-eu" rows="3" placeholder="Mesedez idatzi mezua euskeraz..." oninput="onGroupTplInput(this)"></textarea>
         <div class="wa-list" id="group-msg-list"></div>
       </div>
     </div>
@@ -449,6 +462,10 @@ input:checked+.togslider:before{transform:translateX(16px);}
       <span style="font-size:18px">🎂</span>
       <span class="bdaytext">Esta semana es el cumpleaños de <strong id="pbp"></strong></span>
     </div>
+    <div id="paa" class="annivalert" style="display:none;">
+      <span style="font-size:18px">🎉</span>
+      <span class="bdaytext">¡Esta semana es el aniversario de <strong id="pap"></strong> en Familia Canexion!</span>
+    </div>
     <!-- Mascotas -->
     <div class="sec">
       <div class="seclabel">Mascotas</div>
@@ -463,6 +480,16 @@ input:checked+.togslider:before{transform:translateX(16px);}
     <div class="sec" style="margin-top:12px;">
       <div class="seclabel">Código postal</div>
       <div class="pcval" id="pcp">—</div>
+    </div>
+    <!-- Dirección -->
+    <div class="sec" id="paddr-sec" style="margin-top:12px;display:none;">
+      <div class="seclabel">Dirección</div>
+      <div class="pcval" id="paddr">—</div>
+    </div>
+    <!-- Idioma de comunicación -->
+    <div class="sec" style="margin-top:12px;">
+      <div class="seclabel">Idioma de comunicación</div>
+      <div class="pcval" id="plang">—</div>
     </div>
     <!-- Consentimiento comunicaciones -->
     <div class="sec" style="margin-top:12px;">
@@ -572,7 +599,15 @@ input:checked+.togslider:before{transform:translateX(16px);}
     <div class="fg"><label class="fl">Nombre completo *</label><input class="fi" id="fn" type="text" placeholder="Ej. Ane Etxeberria"/></div>
     <div class="fg"><label class="fl">Teléfono (WhatsApp) *</label><input class="fi" id="fph" type="tel" placeholder="6XX XXX XXX"/></div>
     <div class="fg"><label class="fl">Email (opcional)</label><input class="fi" id="fe" type="email" placeholder="email@ejemplo.com"/></div>
-    <div class="fg"><label class="fl">Código postal</label><input class="fi" id="fcp" type="text" placeholder="Ej. 20001" maxlength="10"/></div>
+    <div class="fg"><label class="fl">Código postal *</label><input class="fi" id="fcp" type="text" placeholder="Ej. 20001" maxlength="10"/></div>
+    <div class="fg"><label class="fl">Dirección (opcional)</label><input class="fi" id="faddr" type="text" placeholder="Ej. Calle Mayor 12, 3ºA"/></div>
+    <div class="fg">
+      <label class="fl">Idioma de comunicación *</label>
+      <div class="lang-group">
+        <label class="lang-opt"><input type="radio" name="flang" id="flang-es" value="es" checked/>🇪🇸 Castellano</label>
+        <label class="lang-opt"><input type="radio" name="flang" id="flang-eu" value="eu"/>🏔 Euskera</label>
+      </div>
+    </div>
     <div class="fg">
       <label class="fl">¿Cuántas mascotas? *</label>
       <select class="fsel" id="fpetcount" onchange="renderModalPetForms(this.value)">
@@ -669,7 +704,10 @@ input:checked+.togslider:before{transform:translateX(16px);}
       <div class="wa-editor">
         <span class="wa-editor-label">Mensaje WhatsApp (editable)</span>
         <div class="wa-editor-vars">Variables: <code>[NOMBRE]</code> <code>[CUPON]</code> <code>[DESCUENTO]</code> <code>[CADUCIDAD]</code></div>
-        <textarea class="wa-tarea" id="wa-msg-template" rows="6"></textarea>
+        <span class="lang-label">🇪🇸 Castellano</span>
+        <textarea class="wa-tarea" id="wa-msg-template" rows="5"></textarea>
+        <span class="lang-label">🏔 Euskera <span style="font-weight:400;color:var(--tm)">(opcional)</span></span>
+        <textarea class="wa-tarea" id="wa-msg-template-eu" rows="5" placeholder="Mesedez idatzi mezua euskeraz..."></textarea>
       </div>
       <button class="subbtn" id="launch-btn" style="margin-top:12px;" onclick="launchCampaign()">Guardar campaña</button>
       <div id="wa-section" style="display:none;">
@@ -864,6 +902,16 @@ function getPetAge(petBday) {
   if (isNaN(bday.getTime())) return null;
   return (Date.now() - bday.getTime()) / (1000*60*60*24*365.25);
 }
+function checkAnniversaryWeek(createdAt) {
+  if (!createdAt) return false;
+  const d = new Date(createdAt);
+  if (isNaN(d.getTime())) return false;
+  const today = new Date();
+  const anniv = new Date(today.getFullYear(), d.getMonth(), d.getDate());
+  const diff = (anniv - today) / (1000 * 60 * 60 * 24);
+  return diff >= -1 && diff <= 7; // ventana: ayer hasta 7 días
+}
+
 function checkBirthdayWeek(petBday) {
   if (!petBday) return false;
   const today = new Date(), bday = new Date(petBday);
@@ -936,7 +984,10 @@ function mapClient(c) {
     petAge:            pets.length > 0 ? getPetAge(pets[0].pet_bday) : null,
     marketing_consent: c.marketing_consent === true,
     photo_consent:     c.photo_consent === true,
-    wk_client_id:      c.wk_client_id || null
+    wk_client_id:      c.wk_client_id || null,
+    address:           c.address || "",
+    language:          c.language || "es",
+    anniversaryWeek:   checkAnniversaryWeek(c.created_at)
   };
 }
 
@@ -1071,8 +1122,10 @@ function renderList(list) {
         <div class="cbs">
           ${active   > 0 ? `<span class="badge active">${active} activo${active > 1 ? "s" : ""}</span>` : ""}
           ${campaign > 0 ? `<span class="badge campaign">${campaign} campaña${campaign > 1 ? "s" : ""}</span>` : ""}
-          ${c.birthdayWeek ? '<span class="badge birthday">🎂 Cumpleaños</span>' : ""}
-          ${c.wk_client_id ? '<span class="badge wk">⚡ Wakyma</span>' : ""}
+          ${c.birthdayWeek    ? '<span class="badge birthday">🎂 Cumpleaños</span>' : ""}
+          ${c.anniversaryWeek ? '<span class="badge eu">🎉 Aniversario</span>'    : ""}
+          ${c.wk_client_id    ? '<span class="badge wk">⚡ Wakyma</span>'         : ""}
+          ${c.language === "eu" ? '<span class="badge eu">EUS</span>'            : ""}
         </div>
       </div>
     </div>`;
@@ -1118,6 +1171,29 @@ function openProfile(id) {
 
   // Código postal
   document.getElementById("pcp").textContent = c.postal_code || "—";
+
+  // Dirección
+  const paddrSec = document.getElementById("paddr-sec");
+  if (c.address) {
+    paddrSec.style.display = "";
+    document.getElementById("paddr").textContent = c.address;
+  } else {
+    paddrSec.style.display = "none";
+  }
+
+  // Idioma de comunicación
+  document.getElementById("plang").innerHTML = c.language === "eu"
+    ? '<span class="badge eu" style="font-size:12px;padding:3px 10px;">🏔 Euskera</span>'
+    : '🇪🇸 Castellano';
+
+  // Alerta aniversario
+  const aa = document.getElementById("paa");
+  if (c.anniversaryWeek) {
+    aa.style.display = "flex";
+    document.getElementById("pap").textContent = c.name.split(" ")[0];
+  } else {
+    aa.style.display = "none";
+  }
 
   // Consentimientos
   document.getElementById("p-consent").innerHTML =
@@ -1420,6 +1496,8 @@ async function addClient() {
       name, phone, since: formatSince(),
       email:       document.getElementById("fe").value.trim(),
       postal_code: document.getElementById("fcp").value.trim(),
+      address:     document.getElementById("faddr").value.trim(),
+      language:    document.querySelector('#modal-client input[name="flang"]:checked')?.value || "es",
       pets:        pets,
       pet:         pets[0].name,
       species:     pets[0].species,
@@ -1439,7 +1517,8 @@ async function addClient() {
     document.getElementById("check-privacy").checked   = false;
     document.getElementById("check-marketing").checked = false;
     document.getElementById("check-photos").checked    = false;
-    ["fn","fph","fe","fcp"].forEach(id => document.getElementById(id).value = "");
+    ["fn","fph","fe","fcp","faddr"].forEach(id => document.getElementById(id).value = "");
+    document.getElementById("flang-es").checked = true;
     document.getElementById("fpetcount").value = "1";
     renderModalPetForms(1);
     document.querySelectorAll('#modal-svc-group input').forEach(cb => cb.checked = false);
@@ -1710,17 +1789,21 @@ async function launchCampaign() {
 
 function showWaList(list, coupon) {
   document.getElementById("wa-section").style.display = "block";
-  // Usar el template editable por el usuario
-  const tpl = (document.getElementById("wa-msg-template").value || "")
-    .replace("[CUPON]",    coupon.name)
-    .replace("[DESCUENTO]",coupon.desc)
-    .replace("[CADUCIDAD]",coupon.expiry || "");
+  const fillVars = (t) => (t || "")
+    .replace("[CUPON]",     coupon.name)
+    .replace("[DESCUENTO]", coupon.desc)
+    .replace("[CADUCIDAD]", coupon.expiry || "");
+  const tplEs = fillVars(document.getElementById("wa-msg-template").value);
+  const tplEu = fillVars(document.getElementById("wa-msg-template-eu").value);
   document.getElementById("wa-list").innerHTML = list.map(c => {
     const phone     = (c.phone||"").toString().replace(/\D/g, "");
     const fullPhone = phone.startsWith("34") ? phone : "34"+phone;
-    const msg       = encodeURIComponent(tpl.replace("[NOMBRE]", c.name.split(" ")[0]));
+    const useEu     = c.language === "eu" && tplEu.trim();
+    const tpl       = useEu ? tplEu : tplEs;
+    const langTag   = c.language === "eu" ? ' <span style="font-size:10px;color:var(--pu);font-weight:500;">EUS</span>' : "";
+    const msg       = encodeURIComponent(tpl.replace(/\[NOMBRE\]/g, c.name.split(" ")[0]));
     return `<div class="wa-item">
-      <div class="wa-info"><div class="wa-name">${c.name}</div><div class="wa-phone">${c.phone}</div></div>
+      <div class="wa-info"><div class="wa-name">${c.name}${langTag}</div><div class="wa-phone">${c.phone}</div></div>
       <a class="wa-btn" href="https://wa.me/${fullPhone}?text=${msg}" target="_blank">WhatsApp</a>
     </div>`;
   }).join("");
@@ -2124,7 +2207,8 @@ function applyFilters() {
     c.pets.some(p => (p.name||"").toLowerCase().includes(q))
   );
 
-  if (activeFilters.has("birthday")) list = list.filter(c => c.birthdayWeek);
+  if (activeFilters.has("birthday"))     list = list.filter(c => c.birthdayWeek);
+  if (activeFilters.has("anniversary"))  list = list.filter(c => c.anniversaryWeek);
   if (activeFilters.has("coupon"))   list = list.filter(c => hasUnusedCoupon(c));
   if (activeFilters.has("expiry"))   list = list.filter(c => {
     const now = new Date(), in7 = new Date(now.getTime() + 7 * 86400000);
@@ -2189,16 +2273,25 @@ function updateGroupMsgPanel() {
     note.textContent = excluded > 0
       ? `${excluded} miembro${excluded > 1 ? "s" : ""} excluido${excluded > 1 ? "s" : ""} por falta de consentimiento`
       : "";
-    const tpl = document.getElementById("group-msg-tpl");
-    if (!tpl._userEdited) {
-      if (activeFilters.has("birthday"))
-        tpl.value = "Hola [NOMBRE] 🎂 Esta semana es el cumpleaños de tu peque. ¡Felicidades desde Canexion! Acércate cuando quieras.";
-      else if (activeFilters.has("expiry"))
-        tpl.value = "Hola [NOMBRE] ⏰ Tienes un cupón en Familia Canexion que caduca muy pronto. ¡No dejes que se pierda!";
-      else if (activeFilters.has("coupon"))
-        tpl.value = "Hola [NOMBRE], te recordamos que tienes un beneficio disponible en Familia Canexion que aún no has usado. ¡No dejes que caduque!";
-      else
-        tpl.value = "Hola [NOMBRE], desde Familia Canexion queremos enviarte un mensaje.";
+    const tplEs = document.getElementById("group-msg-tpl-es");
+    const tplEu = document.getElementById("group-msg-tpl-eu");
+    if (!tplEs._userEdited) {
+      if (activeFilters.has("birthday")) {
+        tplEs.value = "Hola [NOMBRE] 🎂 Esta semana es el cumpleaños de tu peque. ¡Felicidades desde Canexion!";
+        tplEu.value = "Kaixo [NOMBRE] 🎂 Aste honetan zure txikitxoaren urtebetetzea da. Zoriontsuak Canexion-etik!";
+      } else if (activeFilters.has("anniversary")) {
+        tplEs.value = "Hola [NOMBRE] 🎉 ¡Hoy es tu aniversario en Familia Canexion! Un año más juntos cuidando a tu peque.";
+        tplEu.value = "Kaixo [NOMBRE] 🎉 Gaur Familia Canexion-en urtebetetzea duzu! Urte bat gehiago zure txikitxoa zaintzen elkarrekin.";
+      } else if (activeFilters.has("expiry")) {
+        tplEs.value = "Hola [NOMBRE] ⏰ Tienes un cupón en Familia Canexion que caduca muy pronto. ¡No dejes que se pierda!";
+        tplEu.value = "Kaixo [NOMBRE] ⏰ Familia Canexion-eko kupoi bat laster iraungiko zaizu. Ez utzi galtzea!";
+      } else if (activeFilters.has("coupon")) {
+        tplEs.value = "Hola [NOMBRE], te recordamos que tienes un beneficio disponible en Familia Canexion que aún no has usado.";
+        tplEu.value = "Kaixo [NOMBRE], oraindik erabili gabeko onura bat duzu Familia Canexion-en. Ez utzi iraungitzen!";
+      } else {
+        tplEs.value = "Hola [NOMBRE], desde Familia Canexion queremos enviarte un mensaje.";
+        tplEu.value = "Kaixo [NOMBRE], Familia Canexion-etik mezu bat bidali nahi dizugu.";
+      }
     }
   } else {
     wrap.style.display = "none";
@@ -2212,8 +2305,14 @@ function toggleGroupMsg() {
   if (panel.classList.contains("open")) buildGroupMsgLinks();
 }
 
+function onGroupTplInput(el) {
+  el._userEdited = true;
+  if (document.getElementById("group-msg-panel").classList.contains("open")) buildGroupMsgLinks();
+}
+
 function buildGroupMsgLinks() {
-  const tpl       = document.getElementById("group-msg-tpl").value;
+  const tplEs     = document.getElementById("group-msg-tpl-es").value;
+  const tplEu     = document.getElementById("group-msg-tpl-eu").value;
   const list      = document.getElementById("group-msg-list");
   const recipients = filtered.filter(c => c.marketing_consent);
   if (!recipients.length) {
@@ -2221,11 +2320,14 @@ function buildGroupMsgLinks() {
     return;
   }
   list.innerHTML = recipients.map(c => {
-    const phone = (c.phone||"").replace(/\D/g,"");
-    const fp    = phone.startsWith("34") ? phone : "34"+phone;
-    const msg   = encodeURIComponent(tpl.replace(/\[NOMBRE\]/g, c.name.split(" ")[0]));
+    const phone    = (c.phone||"").replace(/\D/g,"");
+    const fp       = phone.startsWith("34") ? phone : "34"+phone;
+    const useEu    = c.language === "eu" && tplEu.trim();
+    const tpl      = useEu ? tplEu : tplEs;
+    const msg      = encodeURIComponent(tpl.replace(/\[NOMBRE\]/g, c.name.split(" ")[0]));
+    const langTag  = c.language === "eu" ? ' <span style="font-size:10px;color:var(--pu);font-weight:500;">EUS</span>' : "";
     return `<div class="wa-item">
-      <div class="wa-info"><div class="wa-name">${c.name}</div><div class="wa-phone">${c.phone}</div></div>
+      <div class="wa-info"><div class="wa-name">${c.name}${langTag}</div><div class="wa-phone">${c.phone}</div></div>
       <a class="wa-btn" href="https://wa.me/${fp}?text=${msg}" target="_blank">WhatsApp</a>
     </div>`;
   }).join("");
@@ -2281,7 +2383,30 @@ function activateExpiryFilter() {
 // ── MAPA OPENSTREETMAP (Leaflet + Nominatim) ─────────────
 let _map = null;
 let _markersLayer = null;
-const cpCache = {}; // cp → {lat,lng} | null
+const cpCache   = {}; // cp → {lat,lng} | null
+const addrCache = {}; // "address_cp" → {lat,lng} | null
+
+async function geocodeClient(c) {
+  if (c.address && c.address.trim() && c.postal_code) {
+    const key = (c.address.trim() + "_" + c.postal_code.trim()).toLowerCase().replace(/\s+/g,"_");
+    if (key in addrCache) return addrCache[key];
+    try {
+      const q = encodeURIComponent(c.address.trim() + ", " + c.postal_code.trim() + ", Spain");
+      const r = await fetch(
+        `https://nominatim.openstreetmap.org/search?q=${q}&countrycodes=es&format=json&limit=1`,
+        { headers: { "User-Agent": "FamiliaCanexion-CRM/1.0" } }
+      );
+      const d = await r.json();
+      if (d && d.length) {
+        addrCache[key] = { lat: parseFloat(d[0].lat), lng: parseFloat(d[0].lon) };
+        return addrCache[key];
+      }
+    } catch(e) {}
+    await new Promise(r => setTimeout(r, 400));
+    addrCache[key] = null;
+  }
+  return c.postal_code ? geocodeCP(c.postal_code) : null;
+}
 
 async function geocodeCP(cp) {
   const key = cp.replace(/\s/g, "");
@@ -2338,27 +2463,36 @@ async function renderMap() {
   const withCP  = filtered.filter(c => c.postal_code && c.postal_code.trim());
   const noCP    = filtered.length - withCP.length;
 
-  // Actualizar barra de stats con "geocodificando..."
   const statsEl = document.getElementById("map-stats");
   statsEl.innerHTML = `<span class="map-stat">🔍 Geocodificando ${withCP.length} miembros...</span>`;
 
-  // Geocodificar CPs nuevos respetando el rate limit de Nominatim (1 req/s)
-  const uniqueCPs = [...new Set(withCP.map(c => c.postal_code.trim()))].filter(cp => !(cp in cpCache));
+  // Pre-geocodificar CPs únicos (sin dirección) respetando rate limit Nominatim
+  const uniqueCPs = [...new Set(
+    withCP.filter(c => !c.address).map(c => c.postal_code.trim())
+  )].filter(cp => !(cp in cpCache));
   for (const cp of uniqueCPs) {
     await geocodeCP(cp);
+    await new Promise(r => setTimeout(r, 400));
+  }
+
+  // Geocodificar clientes con dirección (individualmente, caché propia)
+  for (const c of withCP.filter(c => c.address && c.address.trim())) {
+    await geocodeClient(c);
     await new Promise(r => setTimeout(r, 400));
   }
 
   // Colocar marcadores
   const bounds = [];
   for (const c of withCP) {
-    const coord = cpCache[c.postal_code.trim()];
+    const coord = await geocodeClient(c);
     if (!coord) continue;
-    // Jitter para que pins del mismo CP no se solapen
-    const lat = coord.lat + (Math.random() - 0.5) * 0.005;
-    const lng = coord.lng + (Math.random() - 0.5) * 0.005;
+    // Jitter solo si usa CP (sin dirección propia)
+    const hasAddr = c.address && c.address.trim();
+    const lat = coord.lat + (hasAddr ? 0 : (Math.random() - 0.5) * 0.005);
+    const lng = coord.lng + (hasAddr ? 0 : (Math.random() - 0.5) * 0.005);
     const color = mapMarkerColor(c);
     const petStr = c.pets.map(p => p.name).join(", ") || "—";
+    const locStr = hasAddr ? c.address : ("📮 " + c.postal_code);
     const marker = L.circleMarker([lat, lng], {
       radius: 9, fillColor: color, color: "#fff",
       weight: 2, opacity: 1, fillOpacity: 0.88
@@ -2367,7 +2501,7 @@ async function renderMap() {
       <div style="font-family:'DM Sans',sans-serif;min-width:170px;padding:2px 0;">
         <div style="font-weight:500;font-size:14px;margin-bottom:4px;color:#1a2a1c;">${c.name}</div>
         <div style="font-size:12px;color:#4a6050;margin-bottom:2px;">🐾 ${petStr}</div>
-        <div style="font-size:12px;color:#8aaa90;margin-bottom:8px;">📮 ${c.postal_code}</div>
+        <div style="font-size:12px;color:#8aaa90;margin-bottom:8px;">${locStr}</div>
         <button onclick="openProfileFromMap('${c.id}')"
           style="width:100%;background:#2d6a35;color:white;border:none;border-radius:6px;padding:7px 0;font-size:12px;font-weight:500;cursor:pointer;font-family:'DM Sans',sans-serif;">
           Ver perfil →

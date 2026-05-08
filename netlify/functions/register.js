@@ -53,10 +53,11 @@ exports.handler = async (event) => {
 
   try {
     const payload = JSON.parse(event.body || "{}");
-    const { name, phone, email, postal_code, pets, svc, benefits,
-            marketing_consent, photo_consent, since, pet, species, pet_bday } = payload;
+    const { name, phone, email, postal_code, address, language,
+            pets, svc, benefits, marketing_consent, photo_consent,
+            since, pet, species, pet_bday } = payload;
 
-    if (!name || !phone) {
+    if (!name || !phone || !postal_code) {
       return { statusCode: 400, headers: cors, body: JSON.stringify({ error: "Faltan campos obligatorios" }) };
     }
 
@@ -99,6 +100,8 @@ exports.handler = async (event) => {
       pet_bday:          pet_bday || (pets?.[0]?.pet_bday || null),
       svc:               svc   || "[]",
       benefits:          benefits || [],
+      address:           address || "",
+      language:          language || "es",
       marketing_consent: !!marketing_consent,
       photo_consent:     !!photo_consent,
       wk_client_id:      wkClientId,

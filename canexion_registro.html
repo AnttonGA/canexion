@@ -96,6 +96,11 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--tp);min-h
 .fi.error,.fsel.error{border-color:#d09090;}
 /* WAKYMA HINT */
 .wk-found-hint{display:none;margin-top:7px;background:#e8f4ea;border:1px solid #b8deba;border-radius:var(--rs);padding:9px 13px;font-size:13px;color:var(--gm);line-height:1.4;}
+/* IDIOMA */
+.lang-group{display:flex;gap:8px;margin-top:2px;}
+.lang-opt{flex:1;display:flex;align-items:center;justify-content:center;gap:7px;background:var(--bg);border:1px solid var(--bd);border-radius:var(--rs);padding:10px 12px;font-size:14px;color:var(--tp);cursor:pointer;transition:border-color .15s;}
+.lang-opt:has(input:checked){border-color:var(--gs);background:var(--gg);}
+.lang-opt input{display:none;}
 /* PRIVACIDAD */
 .privacy-group{margin:18px 0 0;display:flex;flex-direction:column;gap:12px;}
 .privacy-item{display:flex;align-items:flex-start;gap:10px;cursor:pointer;}
@@ -149,6 +154,24 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--tp);min-h
         <label class="fl">Código postal *</label>
         <input class="fi" id="fcp" type="text" placeholder="Ej. 20001" maxlength="10" autocomplete="postal-code"/>
         <div class="field-error" id="err-fcp">Introduce tu código postal</div>
+      </div>
+      <div class="fg">
+        <label class="fl">Dirección (opcional)</label>
+        <input class="fi" id="faddr" type="text" placeholder="Ej. Calle Mayor 12, 3ºA" autocomplete="street-address"/>
+        <div class="hint">Solo calle y portal. Nos ayuda a mejorar nuestros servicios en tu zona.</div>
+      </div>
+      <div class="fg">
+        <label class="fl">Idioma de comunicación *</label>
+        <div class="lang-group">
+          <label class="lang-opt">
+            <input type="radio" name="flang" id="flang-es" value="es" checked/>
+            🇪🇸 Castellano
+          </label>
+          <label class="lang-opt">
+            <input type="radio" name="flang" id="flang-eu" value="eu"/>
+            🏔 Euskera
+          </label>
+        </div>
       </div>
 
       <div class="form-section-title">Tus mascotas</div>
@@ -439,6 +462,8 @@ async function submitForm() {
   const phone      = document.getElementById("fph").value.trim().replace(/\s/g, "");
   const email      = document.getElementById("fe").value.trim();
   const postalCode = document.getElementById("fcp").value.trim();
+  const address    = document.getElementById("faddr").value.trim();
+  const language   = document.querySelector('input[name="flang"]:checked')?.value || "es";
 
   // Recoger mascotas
   const petCount = parseInt(document.getElementById("fpetcount").value) || 1;
@@ -474,6 +499,8 @@ async function submitForm() {
         name, phone, email,
         since:       formatSince(),
         postal_code: postalCode,
+        address,
+        language,
         pets,
         pet:         pets[0].name,
         species:     pets[0].species,
