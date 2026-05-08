@@ -1,4 +1,4 @@
-const WAKYMA_KEY = "hcV9EhBNSXVINsvhuo4Oxuoy5_jR-6aaaqTWBotDies1da4R";
+const WAKYMA_KEY = process.env.WAKYMA_KEY;
 
 exports.handler = async (event) => {
   // Responder preflight OPTIONS

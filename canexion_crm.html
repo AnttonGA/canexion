@@ -473,6 +473,7 @@ input:checked+.togslider:before{transform:translateX(16px);}
       <div class="wk-panel-header">
         <div class="seclabel" style="margin-bottom:0;">Wakyma</div>
         <span class="wk-loading" id="wk-loading"></span>
+        <button class="camp-act-btn" id="wk-sync-btn" onclick="syncFromWakyma()" style="margin-left:auto;font-size:11px;padding:4px 10px;">🔄 Sincronizar</button>
       </div>
       <div class="pgrid" id="wk-panel"></div>
     </div>
@@ -731,7 +732,6 @@ const SUPABASE_URL = "https://lhvaonkibrfujdbbhkkr.supabase.co";
 const SUPABASE_KEY = "sb_publishable_wwY0Zcd-sxz5Gqr_NJ7zhg_5OkSiCU0";
 
 // ── WAKYMA ────────────────────────────────────────────────
-const WAKYMA_KEY = "hcV9EhBNSXVINsvhuo4Oxuoy5_jR-6aaaqTWBotDies1da4R";
 const WAKYMA_URL = "https://vets.wakyma.com";
 
 // Rate limiter — nunca supera 28 llamadas/minuto (límite API: 30)
@@ -808,7 +808,6 @@ function fmtWkDate(d) {
   return dt.getDate() + " " + ms[dt.getMonth()] + " " + dt.getFullYear();
 }
 
-const PASSWORD    = "canexion2025";
 const SESSION_KEY = "fcx_auth";
 
 // ── ESTADO ───────────────────────────────────────────────
@@ -935,7 +934,8 @@ function mapClient(c) {
     birthdayPets:      birthdayPets,
     petAge:            pets.length > 0 ? getPetAge(pets[0].pet_bday) : null,
     marketing_consent: c.marketing_consent === true,
-    photo_consent:     c.photo_consent === true
+    photo_consent:     c.photo_consent === true,
+    wk_client_id:      c.wk_client_id || null
   };
 }
 
@@ -975,14 +975,27 @@ function showToast(msg, isErr = false) {
 }
 
 // ── LOGIN ─────────────────────────────────────────────────
-function checkPwd() {
-  if (document.getElementById("pwd").value === PASSWORD) {
-    sessionStorage.setItem(SESSION_KEY, "1");
-    showApp();
-  } else {
+async function checkPwd() {
+  const btn = document.querySelector(".lbtn");
+  const pw  = document.getElementById("pwd").value;
+  btn.disabled = true; btn.textContent = "Verificando...";
+  try {
+    const r = await fetch("/.netlify/functions/login", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ password: pw })
+    });
+    if (r.ok) {
+      sessionStorage.setItem(SESSION_KEY, "1");
+      showApp();
+    } else {
+      document.getElementById("lerr").style.display = "block";
+      document.getElementById("pwd").value = "";
+    }
+  } catch(e) {
     document.getElementById("lerr").style.display = "block";
-    document.getElementById("pwd").value = "";
   }
+  btn.disabled = false; btn.textContent = "Entrar";
 }
 function logout() { sessionStorage.removeItem(SESSION_KEY); location.reload(); }
 function showApp() {
@@ -1235,6 +1248,47 @@ async function loadWakymaPanel(phone) {
       </div>`;
     loadEl.style.display = "none";
   } catch(e) { loadEl.textContent = "No disponible"; }
+}
+
+async function syncFromWakyma() {
+  if (!current) return;
+  const btn = document.getElementById("wk-sync-btn");
+  btn.disabled = true; btn.textContent = "Buscando...";
+  try {
+    const phone = (current.phone||"").replace(/\D/g,"");
+    const cRes  = await wk("/api/v3/clients?phone=" + encodeURIComponent(phone));
+    const cList = Array.isArray(cRes) ? cRes : (cRes.data || []);
+    if (!cList.length) { showToast("No encontrado en Wakyma", true); return; }
+    const wkC    = cList[0];
+    const wkId   = String(wkC.id);
+
+    // Detectar campos que han cambiado
+    const updates = {};
+    const labels  = [];
+    const wkName  = [wkC.name, wkC.surname].filter(Boolean).join(" ");
+    if (wkName   && wkName   !== current.name)         { updates.name         = wkName;                          labels.push("Nombre"); }
+    if (wkC.email && wkC.email !== current.email)       { updates.email        = wkC.email;                       labels.push("Email"); }
+    const wkCP = wkC.cp || wkC.postalCode || "";
+    if (wkCP && wkCP !== current.postal_code)           { updates.postal_code  = wkCP;                            labels.push("Código postal"); }
+    if (wkId !== current.wk_client_id)                  { updates.wk_client_id = wkId; }
+
+    if (!Object.keys(updates).length) { showToast("Datos ya sincronizados ✓"); return; }
+
+    const msg = labels.length
+      ? `Actualizar desde Wakyma:\n${labels.map(l => "• " + l).join("\n")}\n\n¿Confirmar?`
+      : "Vincular ID de Wakyma a este perfil. ¿Confirmar?";
+    if (!confirm(msg)) return;
+
+    await sb("PATCH", "clients", { filter: "id=eq." + current.id, body: updates });
+    Object.assign(current, updates);
+    const idx = clients.findIndex(c => c.id === current.id);
+    if (idx >= 0) Object.assign(clients[idx], updates);
+
+    // Refrescar nombre en pantalla si cambió
+    if (updates.name) document.getElementById("pn").textContent = updates.name;
+    showToast("Perfil sincronizado con Wakyma ✓");
+  } catch(e) { showToast("Error al sincronizar: " + e.message, true); }
+  btn.disabled = false; btn.textContent = "🔄 Sincronizar";
 }
 
 function goBack() {
@@ -1607,7 +1661,7 @@ async function launchCampaign() {
   btn.disabled = true; btn.textContent = "Lanzando...";
   try {
     const recipientCount = previewedClients.length;
-    await sb("POST", "campaigns", { body: {
+    const campResult = await sb("POST", "campaigns", { body: {
       name:            campCoupon.name,
       description:     campCoupon.desc,
       discount:        campCoupon.desc,
@@ -1615,6 +1669,9 @@ async function launchCampaign() {
       conditions:      getConditions(),
       recipient_count: recipientCount
     }});
+    // Guardar el ID de la campaña en el cupón para trazabilidad
+    const campId = campResult?.[0]?.id ? String(campResult[0].id) : null;
+    if (campId) campCoupon.campaign_id = campId;
 
     // Asignar beneficio a cada cliente — con protección anti-duplicados
     for (const c of previewedClients) {

@@ -460,42 +460,39 @@ async function submitForm() {
   };
 
   try {
-    // Comprobar duplicado por teléfono
-    const dupRes  = await fetch(SUPABASE_URL + "/rest/v1/clients?phone=eq." + encodeURIComponent(phone), { headers });
-    const dupData = await dupRes.json();
-    if (dupData && dupData.length > 0) {
-      btn.disabled    = false;
-      btn.textContent = "Unirme a Familia Canexion";
-      alert("Este teléfono ya está registrado en Familia Canexion.\n\nSi tienes dudas escríbenos por WhatsApp al 943 04 87 83.");
-      return;
-    }
-
-    // Construir beneficios
+    // Construir beneficios (en cliente, no expone keys)
     const benefits = buildBenefits(svcKey);
 
-    // Registrar cliente
-    const res = await fetch(SUPABASE_URL + "/rest/v1/clients", {
+    // Enviar al servidor para validar, enriquecer con Wakyma e insertar
+    const res = await fetch("/.netlify/functions/register", {
       method:  "POST",
-      headers: { ...headers, "Prefer": "return=representation" },
+      headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         name, phone, email,
         since:       formatSince(),
         postal_code: postalCode,
-        pets:        pets,
-        // Columnas legacy para retrocompatibilidad con clientes existentes
+        pets,
         pet:         pets[0].name,
         species:     pets[0].species,
         pet_bday:    pets[0].pet_bday || null,
         svc:               JSON.stringify(svcArray),
         marketing_consent: document.getElementById("check-marketing").checked,
         photo_consent:     document.getElementById("check-photos").checked,
-        notes:             "",
         benefits
       })
     });
 
-    if (!res.ok) throw new Error(await res.text());
-    showConfirmation({ name, benefits });
+    const data = await res.json();
+
+    if (res.status === 409) {
+      btn.disabled    = false;
+      btn.textContent = "Unirme a Familia Canexion";
+      alert("Este teléfono ya está registrado en Familia Canexion.\n\nSi tienes dudas escríbenos por WhatsApp al 943 04 87 83.");
+      return;
+    }
+    if (!res.ok) throw new Error(data.error || "Error desconocido");
+
+    showConfirmation({ name, benefits, foundInWakyma: data.foundInWakyma });
 
   } catch(e) {
     btn.disabled    = false;
