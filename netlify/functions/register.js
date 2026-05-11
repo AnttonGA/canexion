@@ -33,20 +33,24 @@ async function sbFetch(method, path, body) {
 
 // ── Wakyma GET helper ─────────────────────────────────────
 async function wkFetch(endpoint) {
-  if (!WAKYMA_KEY) return null;
+  if (!WAKYMA_KEY) { console.log("[WK-DIAG] WAKYMA_KEY no está configurada"); return null; }
   try {
     const r = await fetch("https://vets.wakyma.com" + endpoint, {
       headers: { "Authorization": "Bearer " + WAKYMA_KEY }
     });
+    const text = await r.text();
+    console.log(`[WK-DIAG] GET ${endpoint} → HTTP ${r.status}: ${text.slice(0, 200)}`);
     if (!r.ok) return null;
-    const data = await r.json();
-    return data?.data ?? data;
-  } catch(e) { return null; }
+    return JSON.parse(text)?.data ?? JSON.parse(text);
+  } catch(e) {
+    console.log(`[WK-DIAG] GET ${endpoint} → excepción: ${e.message}`);
+    return null;
+  }
 }
 
 // ── Wakyma POST helper ────────────────────────────────────
 async function wkPost(endpoint, body) {
-  if (!WAKYMA_KEY) return null;
+  if (!WAKYMA_KEY) { console.log("[WK-DIAG] WAKYMA_KEY no está configurada"); return null; }
   try {
     const r = await fetch("https://vets.wakyma.com" + endpoint, {
       method:  "POST",
@@ -56,10 +60,14 @@ async function wkPost(endpoint, body) {
       },
       body: JSON.stringify(body)
     });
+    const text = await r.text();
+    console.log(`[WK-DIAG] POST ${endpoint} → HTTP ${r.status}: ${text.slice(0, 300)}`);
     if (!r.ok) return null;
-    const data = await r.json();
-    return data?.data ?? data;
-  } catch(e) { return null; }
+    return JSON.parse(text)?.data ?? JSON.parse(text);
+  } catch(e) {
+    console.log(`[WK-DIAG] POST ${endpoint} → excepción: ${e.message}`);
+    return null;
+  }
 }
 
 // ── Convierte especie en texto al tipo numérico de Wakyma ─
@@ -127,6 +135,7 @@ exports.handler = async (event) => {
 
     } else {
       // 2b — No existe en Wakyma → crear ficha nueva
+      console.log(`[WK-DIAG] Cliente no encontrado en Wakyma, intentando crear: ${name} / ${phone}`);
       try {
         const nameParts = name.trim().split(/\s+/);
         const wkName    = nameParts[0];
@@ -145,6 +154,7 @@ exports.handler = async (event) => {
 
         if (wkClient && wkClient.id) {
           wkClientId = String(wkClient.id);
+          console.log(`[WK-DIAG] Cliente creado en Wakyma con id: ${wkClientId}`);
 
           // Crear mascotas en Wakyma
           const petsList = Array.isArray(pets) ? pets : [];
@@ -162,7 +172,7 @@ exports.handler = async (event) => {
         }
       } catch(e) {
         // Fallo silencioso — el registro en Supabase continúa igualmente
-        console.error("Wakyma create error:", e.message);
+        console.log(`[WK-DIAG] Excepción en bloque de creación: ${e.message}`);
       }
     }
 
