@@ -3,7 +3,7 @@ const SUPABASE_URL = process.env.SUPABASE_URL;
 const SUPABASE_KEY = process.env.SUPABASE_KEY;
 
 async function wakyma(endpoint, opts = {}) {
-  const r = await fetch("https://api.wakyma.com" + endpoint, {
+  const r = await fetch("https://vets.wakyma.com" + endpoint, {
     method: opts.method || "GET",
     headers: {
       "Authorization": "Bearer " + WAKYMA_KEY,
