@@ -15,17 +15,11 @@ exports.handler = async () => {
   const auth = { "Authorization": "Bearer " + WAKYMA_KEY };
 
   const tests = await Promise.all([
-    // Probar distintas URLs base
-    tryFetch("https://api.wakyma.com/api/v3/clients",       auth),
-    tryFetch("https://wakyma.com/api/v3/clients",            auth),
-    tryFetch("https://app.wakyma.com/api/v3/clients",        auth),
-    tryFetch("https://api.wakyma.com/api/v3/",               auth),
-    tryFetch("https://wakyma.com/api/v3/",                   auth),
-    tryFetch("https://app.wakyma.com/api/v3/",               auth),
-    // Raíz de cada dominio (para ver qué responde)
-    tryFetch("https://api.wakyma.com/",                      auth),
-    tryFetch("https://wakyma.com/",                          auth),
-    tryFetch("https://app.wakyma.com/",                      auth),
+    // URL confirmada — la que usa el CRM
+    tryFetch("https://vets.wakyma.com/api/v3/clients?limit=1", auth),
+    // Otras URLs para comparar
+    tryFetch("https://api.wakyma.com/api/v3/clients?limit=1",  auth),
+    tryFetch("https://wakyma.com/api/v3/clients?limit=1",       auth),
   ]);
 
   return {
