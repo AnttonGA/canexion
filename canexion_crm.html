@@ -75,7 +75,11 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--tp);min-h
 .badge.campaign{background:var(--pup);color:var(--pu);}
 .badge.wk{background:#e8f0fe;color:#1a56a0;}
 .badge.eu{background:#f0e8ff;color:#5a3a9a;}
-.annivalert{margin:10px 20px 0;background:#f0e8ff;border:1px solid #c8b0f0;border-radius:var(--rs);padding:10px 14px;display:none;align-items:center;gap:10px;}
+.annivalert{margin:10px 20px 0;background:#f0e8ff;border:1px solid #c8b0f0;border-radius:var(--rs);padding:10px 14px;display:none;flex-direction:column;gap:8px;}
+.annivalert-row{display:flex;align-items:center;gap:10px;}
+.anniv-wa-block{display:flex;flex-direction:column;gap:6px;}
+.anniv-tarea{width:100%;background:rgba(255,255,255,.7);border:1px solid #c8b0f0;border-radius:var(--rs);padding:8px 10px;font-family:'DM Sans',sans-serif;font-size:12px;color:#3a2060;resize:vertical;min-height:60px;outline:none;line-height:1.5;box-sizing:border-box;}
+.anniv-tarea:focus{border-color:#9a6cd0;}
 /* IDIOMA MODAL */
 .lang-group{display:flex;gap:8px;margin-top:2px;}
 .lang-opt{flex:1;display:flex;align-items:center;justify-content:center;gap:7px;background:var(--bg);border:1px solid var(--bd);border-radius:var(--rs);padding:9px 10px;font-size:13px;color:var(--tp);cursor:pointer;transition:border-color .15s;}
@@ -463,8 +467,16 @@ input:checked+.togslider:before{transform:translateX(16px);}
       <span class="bdaytext">Esta semana es el cumpleaños de <strong id="pbp"></strong></span>
     </div>
     <div id="paa" class="annivalert" style="display:none;">
-      <span style="font-size:18px">🎉</span>
-      <span class="bdaytext">¡Esta semana es el aniversario de <strong id="pap"></strong> en Familia Canexion!</span>
+      <div class="annivalert-row">
+        <span style="font-size:18px">🎉</span>
+        <span class="bdaytext">¡Esta semana es el aniversario de <strong id="pap"></strong> en Familia Canexion!</span>
+      </div>
+      <div class="anniv-wa-block">
+        <span style="font-size:11px;font-weight:600;color:#5a3a9a;">💬 Mensaje sugerido (editable)</span>
+        <textarea class="anniv-tarea" id="anniv-msg-es" rows="3"></textarea>
+        <textarea class="anniv-tarea" id="anniv-msg-eu" rows="3" style="display:none;"></textarea>
+        <button class="wa-btn" onclick="sendAnnivWA()" style="align-self:flex-start;">📱 Enviar por WhatsApp</button>
+      </div>
     </div>
     <!-- Mascotas -->
     <div class="sec">
@@ -1190,7 +1202,26 @@ function openProfile(id) {
   const aa = document.getElementById("paa");
   if (c.anniversaryWeek) {
     aa.style.display = "flex";
-    document.getElementById("pap").textContent = c.name.split(" ")[0];
+    const firstName = c.name.split(" ")[0];
+    document.getElementById("pap").textContent = firstName;
+
+    // Calcular años en el programa
+    const years = c.created_at
+      ? Math.max(1, new Date().getFullYear() - new Date(c.created_at).getFullYear())
+      : 1;
+    const ySuffix = years === 1 ? "año" : "años";
+
+    // Mensajes pre-rellenados
+    const msgEs = `¡Hola ${firstName}! 🎉 Hoy hace ${years} ${ySuffix} que eres parte de Familia Canexion. ¡Muchísimas gracias por tu confianza, es un placer tenerte con nosotros! 🐾`;
+    const msgEu = `Kaixo ${firstName}! 🎉 Gaur ${years} urte bete dira Canexion Familiako kide zarela. Eskerrik asko gurekin egoteagatik, pozten gaitu zurekin izateak! 🐾`;
+
+    const isEu = c.language === "eu";
+    const taEs = document.getElementById("anniv-msg-es");
+    const taEu = document.getElementById("anniv-msg-eu");
+    taEs.value = msgEs;
+    taEu.value = msgEu;
+    taEs.style.display = isEu ? "none" : "block";
+    taEu.style.display = isEu ? "block" : "none";
   } else {
     aa.style.display = "none";
   }
@@ -2341,6 +2372,15 @@ function buildGroupMsgLinks() {
       <a class="wa-btn" href="https://wa.me/${fp}?text=${msg}" target="_blank">WhatsApp</a>
     </div>`;
   }).join("");
+}
+
+function sendAnnivWA() {
+  const phone = (current.phone||"").replace(/\D/g,"");
+  const fp    = phone.startsWith("34") ? phone : "34"+phone;
+  const isEu  = current.language === "eu";
+  const ta    = document.getElementById(isEu ? "anniv-msg-eu" : "anniv-msg-es");
+  const msg   = encodeURIComponent(ta.value);
+  window.open(`https://wa.me/${fp}?text=${msg}`, "_blank");
 }
 
 function sendReminder(i) {
