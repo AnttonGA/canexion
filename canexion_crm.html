@@ -80,6 +80,17 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--tp);min-h
 .anniv-wa-block{display:flex;flex-direction:column;gap:6px;}
 .anniv-tarea{width:100%;background:rgba(255,255,255,.7);border:1px solid #c8b0f0;border-radius:var(--rs);padding:8px 10px;font-family:'DM Sans',sans-serif;font-size:12px;color:#3a2060;resize:vertical;min-height:60px;outline:none;line-height:1.5;box-sizing:border-box;}
 .anniv-tarea:focus{border-color:#9a6cd0;}
+.dewormalert{margin:10px 20px 0;background:#f1f8f1;border:1px solid #a5d6a7;border-radius:var(--rs);padding:10px 14px;display:none;flex-direction:column;gap:8px;}
+.deworm-row{display:flex;align-items:flex-start;gap:10px;}
+.deworm-product{font-size:11px;color:#2e7d32;margin-top:2px;}
+.dismiss-btn{background:none;border:1px solid #a5d6a7;border-radius:20px;padding:6px 12px;font-family:'DM Sans',sans-serif;font-size:11px;font-weight:500;color:#2e7d32;cursor:pointer;white-space:nowrap;}
+.dismiss-btn:hover{background:#e8f5e9;}
+.badge.deworm{background:#e8f5e9;color:#2e7d32;}
+.kw-wrap{display:flex;flex-wrap:wrap;gap:6px;margin-top:4px;min-height:28px;}
+.kw-chip{display:inline-flex;align-items:center;gap:5px;background:var(--gg);border:1px solid var(--bd);border-radius:12px;padding:3px 8px 3px 10px;font-size:12px;color:var(--tp);}
+.kw-chip button{background:none;border:none;font-size:14px;line-height:1;cursor:pointer;color:var(--tm);padding:0;}
+.kw-chip button:hover{color:var(--tp);}
+.kw-add-row{display:flex;gap:8px;margin-top:10px;align-items:center;}
 /* IDIOMA MODAL */
 .lang-group{display:flex;gap:8px;margin-top:2px;}
 .lang-opt{flex:1;display:flex;align-items:center;justify-content:center;gap:7px;background:var(--bg);border:1px solid var(--bd);border-radius:var(--rs);padding:9px 10px;font-size:13px;color:var(--tp);cursor:pointer;transition:border-color .15s;}
@@ -404,12 +415,14 @@ input:checked+.togslider:before{transform:translateX(16px);}
       <div class="litem"><div class="ldot" style="background:var(--gs)"></div>Beneficios activos</div>
       <div class="litem"><div class="ldot" style="background:var(--am)"></div>Cumpleaños</div>
       <div class="litem"><div class="ldot" style="background:var(--pu)"></div>Campaña</div>
+      <div class="litem"><div class="ldot" style="background:#4caf50"></div>Desparasitación</div>
     </div>
     <!-- Chips de filtro -->
     <div class="chips-row">
       <button class="chip" data-filter="birthday"     data-cls="on-amber"  onclick="toggleChip('birthday')">🎂 Cumpleaños</button>
       <button class="chip" data-filter="anniversary" data-cls="on-purple" onclick="toggleChip('anniversary')">🎉 Aniversario</button>
       <button class="chip" data-filter="coupon"   data-cls="on-purple" onclick="toggleChip('coupon')">🎁 Cupón sin usar</button>
+      <button class="chip" data-filter="deworm"   data-cls="on"        onclick="toggleChip('deworm')">💊 Desparasitar</button>
       <button class="chip" data-filter="new"      data-cls="on"        onclick="toggleChip('new')">✨ Nuevos</button>
       <button class="chip" data-filter="dog"      data-cls="on"        onclick="toggleChip('dog')">🐶 Perros</button>
       <button class="chip" data-filter="cat"      data-cls="on"        onclick="toggleChip('cat')">🐱 Gatos</button>
@@ -476,6 +489,24 @@ input:checked+.togslider:before{transform:translateX(16px);}
         <textarea class="anniv-tarea" id="anniv-msg-es" rows="3"></textarea>
         <textarea class="anniv-tarea" id="anniv-msg-eu" rows="3" style="display:none;"></textarea>
         <button class="wa-btn" onclick="sendAnnivWA()" style="align-self:flex-start;">📱 Enviar por WhatsApp</button>
+      </div>
+    </div>
+    <div id="pda" class="dewormalert" style="display:none;">
+      <div class="deworm-row">
+        <span style="font-size:18px">💊</span>
+        <div>
+          <span class="bdaytext">Toca desparasitar</span>
+          <div class="deworm-product" id="pda-product"></div>
+        </div>
+      </div>
+      <div class="anniv-wa-block">
+        <span style="font-size:11px;font-weight:600;color:#2e7d32;">💬 Mensaje sugerido (editable)</span>
+        <textarea class="anniv-tarea" id="deworm-msg-es" rows="4" style="border-color:#a5d6a7;background:rgba(255,255,255,.8);"></textarea>
+        <textarea class="anniv-tarea" id="deworm-msg-eu" rows="4" style="border-color:#a5d6a7;background:rgba(255,255,255,.8);display:none;"></textarea>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;">
+          <button class="wa-btn" onclick="sendDewormWA()">📱 WhatsApp</button>
+          <button class="dismiss-btn" onclick="dismissDewormAlert()">✓ Marcar como enviado</button>
+        </div>
       </div>
     </div>
     <!-- Mascotas -->
@@ -575,6 +606,23 @@ input:checked+.togslider:before{transform:translateX(16px);}
         </div>
         <div class="disc-list" id="disc-list">
           <div class="loading-state"><div class="spinner"></div></div>
+        </div>
+      </div>
+
+      <!-- Desparasitación -->
+      <div class="ben-section">
+        <div class="ben-sh">
+          <div>
+            <div class="ben-st">Desparasitación — palabras clave</div>
+            <div class="ben-ss">El escáner diario busca estas palabras en los productos vendidos en Wakyma (hace 75 días) para generar avisos de recordatorio.</div>
+          </div>
+        </div>
+        <div id="kw-list" class="kw-wrap">
+          <div class="loading-state"><div class="spinner"></div></div>
+        </div>
+        <div class="kw-add-row">
+          <input class="fi" id="kw-input" type="text" placeholder="Ej. frontline, pipeta…" style="flex:1;margin:0;" onkeydown="if(event.key==='Enter')addDewormKeyword()"/>
+          <button class="new-camp-btn" onclick="addDewormKeyword()">+ Añadir</button>
         </div>
       </div>
 
@@ -866,6 +914,8 @@ let clients = [], filtered = [], current = null;
 let campaigns        = [];
 let benefitTemplates = [];
 let discoveryCoupons = [];
+let dewormAlertsMap  = {}; // wk_client_id → alert
+let dewormKeywords   = []; // [{id, keyword}, …]
 let campCoupon       = null;
 let previewedClients = [];
 let editingBenId     = null;
@@ -999,7 +1049,8 @@ function mapClient(c) {
     wk_client_id:      c.wk_client_id || null,
     address:           c.address || "",
     language:          c.language || "es",
-    anniversaryWeek:   checkAnniversaryWeek(c.created_at)
+    anniversaryWeek:   checkAnniversaryWeek(c.created_at),
+    dewormAlert:       (c.wk_client_id && dewormAlertsMap[String(c.wk_client_id)]) || null
   };
 }
 
@@ -1075,12 +1126,19 @@ window.addEventListener("DOMContentLoaded", () => {
 // ── CARGA INICIAL ─────────────────────────────────────────
 async function loadAll() {
   try {
-    const [cd, cpd, btd, dcd] = await Promise.all([
+    const todayISO = new Date().toISOString().split("T")[0];
+    const [cd, cpd, btd, dcd, dad, dkd] = await Promise.all([
       sb("GET", "clients",           { order: "created_at.desc" }),
       sb("GET", "campaigns",         { order: "created_at.desc" }),
       sb("GET", "benefit_templates", { order: "order_index"     }),
-      sb("GET", "discovery_coupons")
+      sb("GET", "discovery_coupons"),
+      sb("GET", "deworm_alerts",   { filter: `status=eq.pending&reminder_date=lte.${todayISO}` }),
+      sb("GET", "deworm_keywords", { order: "keyword" })
     ]);
+    // Deworm data debe estar listo antes de mapClient
+    dewormAlertsMap = {};
+    (dad || []).forEach(a => { dewormAlertsMap[String(a.wk_client_id)] = a; });
+    dewormKeywords   = dkd || [];
     clients          = (cd  || []).map(mapClient);
     filtered         = [...clients];
     campaigns        = cpd || [];
@@ -1090,6 +1148,7 @@ async function loadAll() {
     renderCampaigns();
     renderBenefitTemplates();
     renderDiscoveryCoupons();
+    renderDewormKeywords();
     document.getElementById("mc").textContent = clients.length + " miembro" + (clients.length !== 1 ? "s" : "");
     checkExpiringCoupons();
   } catch(e) {
@@ -1134,9 +1193,10 @@ function renderList(list) {
         <div class="cbs">
           ${active   > 0 ? `<span class="badge active">${active} activo${active > 1 ? "s" : ""}</span>` : ""}
           ${campaign > 0 ? `<span class="badge campaign">${campaign} campaña${campaign > 1 ? "s" : ""}</span>` : ""}
-          ${c.birthdayWeek    ? '<span class="badge birthday">🎂 Cumpleaños</span>' : ""}
-          ${c.anniversaryWeek ? '<span class="badge eu">🎉 Aniversario</span>'    : ""}
-          ${c.wk_client_id    ? '<span class="badge wk">⚡ Wakyma</span>'         : ""}
+          ${c.birthdayWeek    ? '<span class="badge birthday">🎂 Cumpleaños</span>'  : ""}
+          ${c.anniversaryWeek ? '<span class="badge eu">🎉 Aniversario</span>'     : ""}
+          ${c.dewormAlert     ? '<span class="badge deworm">💊 Desparasitar</span>' : ""}
+          ${c.wk_client_id    ? '<span class="badge wk">⚡ Wakyma</span>'          : ""}
           ${c.language === "eu" ? '<span class="badge eu">EUS</span>'            : ""}
         </div>
       </div>
@@ -1224,6 +1284,29 @@ function openProfile(id) {
     taEu.style.display = isEu ? "block" : "none";
   } else {
     aa.style.display = "none";
+  }
+
+  // Alerta desparasitación
+  const da = document.getElementById("pda");
+  if (c.dewormAlert) {
+    da.style.display = "flex";
+    const al        = c.dewormAlert;
+    const firstName = c.name.split(" ")[0];
+    const product   = al.product_name || "el antiparasitario";
+    const petPart   = al.pet_name ? ` para ${al.pet_name}` : "";
+    const petPartEu = al.pet_name ? ` (${al.pet_name}rentzat)` : "";
+    document.getElementById("pda-product").textContent = product + (al.pet_name ? ` · ${al.pet_name}` : "");
+    const msgEs = `¡Hola ${firstName}! 💊 Han pasado los 2 meses y medio desde que compraste ${product}${petPart}. ¿Habéis podido hacer la desparasitación? Si necesitáis más producto, podéis pasaros por la clínica 🐾`;
+    const msgEu = `Kaixo ${firstName}! 💊 2 hilabete eta erdi igaro dira ${product}${petPartEu} erosi zenuenetik. Desparasitazioa egin al duzue? Produktu gehiago behar baduzu, etorri klinikara 🐾`;
+    const isEu  = c.language === "eu";
+    const taDe  = document.getElementById("deworm-msg-es");
+    const taEu  = document.getElementById("deworm-msg-eu");
+    taDe.value  = msgEs;
+    taEu.value  = msgEu;
+    taDe.style.display = isEu ? "none" : "block";
+    taEu.style.display = isEu ? "block" : "none";
+  } else {
+    da.style.display = "none";
   }
 
   // Consentimientos
@@ -2250,6 +2333,7 @@ function applyFilters() {
 
   if (activeFilters.has("birthday"))     list = list.filter(c => c.birthdayWeek);
   if (activeFilters.has("anniversary"))  list = list.filter(c => c.anniversaryWeek);
+  if (activeFilters.has("deworm"))       list = list.filter(c => c.dewormAlert);
   if (activeFilters.has("coupon"))   list = list.filter(c => hasUnusedCoupon(c));
   if (activeFilters.has("expiry"))   list = list.filter(c => {
     const now = new Date(), in7 = new Date(now.getTime() + 7 * 86400000);
@@ -2381,6 +2465,66 @@ function sendAnnivWA() {
   const ta    = document.getElementById(isEu ? "anniv-msg-eu" : "anniv-msg-es");
   const msg   = encodeURIComponent(ta.value);
   window.open(`https://wa.me/${fp}?text=${msg}`, "_blank");
+}
+
+function sendDewormWA() {
+  const phone = (current.phone||"").replace(/\D/g,"");
+  const fp    = phone.startsWith("34") ? phone : "34"+phone;
+  const isEu  = current.language === "eu";
+  const ta    = document.getElementById(isEu ? "deworm-msg-eu" : "deworm-msg-es");
+  window.open(`https://wa.me/${fp}?text=${encodeURIComponent(ta.value)}`, "_blank");
+}
+
+async function dismissDewormAlert() {
+  const al = current.dewormAlert;
+  if (!al) return;
+  try {
+    await sb("PATCH", "deworm_alerts", { filter: `id=eq.${al.id}`, body: { status: "sent" } });
+    delete dewormAlertsMap[String(current.wk_client_id)];
+    current.dewormAlert = null;
+    const idx = clients.findIndex(c => c.id === current.id);
+    if (idx >= 0) clients[idx].dewormAlert = null;
+    document.getElementById("pda").style.display = "none";
+    applyFilters();
+    showToast("Marcado como enviado ✓");
+  } catch(e) { showToast("Error al guardar", true); }
+}
+
+function renderDewormKeywords() {
+  const el = document.getElementById("kw-list");
+  if (!el) return;
+  if (!dewormKeywords.length) {
+    el.innerHTML = '<span style="font-size:12px;color:var(--tm);">Sin palabras clave. Añade alguna abajo.</span>';
+    return;
+  }
+  el.innerHTML = dewormKeywords.map(kw =>
+    `<div class="kw-chip">
+      <span>${kw.keyword}</span>
+      <button onclick="deleteDewormKeyword('${kw.id}')" title="Eliminar">×</button>
+    </div>`
+  ).join("");
+}
+
+async function addDewormKeyword() {
+  const input = document.getElementById("kw-input");
+  const kw    = (input.value || "").trim().toLowerCase();
+  if (!kw) return;
+  if (dewormKeywords.some(k => k.keyword === kw)) { showToast("Ya existe esa palabra clave"); return; }
+  try {
+    const res = await sb("POST", "deworm_keywords", { body: { keyword: kw } });
+    dewormKeywords = [...dewormKeywords, ...(Array.isArray(res) ? res : (res ? [res] : [{ id: Date.now(), keyword: kw }]))];
+    dewormKeywords.sort((a,b) => a.keyword.localeCompare(b.keyword));
+    renderDewormKeywords();
+    input.value = "";
+  } catch(e) { showToast("Error al guardar", true); }
+}
+
+async function deleteDewormKeyword(id) {
+  try {
+    await sb("DELETE", "deworm_keywords", { filter: `id=eq.${id}` });
+    dewormKeywords = dewormKeywords.filter(k => String(k.id) !== String(id));
+    renderDewormKeywords();
+  } catch(e) { showToast("Error al eliminar", true); }
 }
 
 function sendReminder(i) {
