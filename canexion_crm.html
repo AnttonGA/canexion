@@ -91,6 +91,21 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--tp);min-h
 .kw-chip button{background:none;border:none;font-size:14px;line-height:1;cursor:pointer;color:var(--tm);padding:0;}
 .kw-chip button:hover{color:var(--tp);}
 .kw-add-row{display:flex;gap:8px;margin-top:10px;align-items:center;}
+/* FEED */
+.feed-wrap{padding:12px 16px 80px;display:flex;flex-direction:column;gap:8px;}
+.feed-date{font-size:11px;font-weight:600;color:var(--tm);text-transform:uppercase;letter-spacing:.5px;padding:4px 0 2px;}
+.feed-card{display:flex;align-items:flex-start;gap:10px;background:var(--sf);border:1px solid var(--bd);border-left:4px solid #888;border-radius:var(--rs);padding:10px 12px;transition:opacity .2s;}
+.feed-card.dismissed{opacity:0;pointer-events:none;height:0;padding:0;margin:0;overflow:hidden;}
+.feed-icon{font-size:20px;flex-shrink:0;margin-top:1px;}
+.feed-body{flex:1;min-width:0;}
+.feed-title{font-size:13px;font-weight:600;color:var(--tp);line-height:1.3;}
+.feed-sub{font-size:11px;color:var(--tm);margin-top:2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.feed-actions{display:flex;flex-direction:column;gap:4px;flex-shrink:0;}
+.feed-btn{background:var(--gg);border:1px solid var(--bd);border-radius:12px;padding:5px 10px;font-family:'DM Sans',sans-serif;font-size:11px;font-weight:500;color:var(--tp);cursor:pointer;white-space:nowrap;text-decoration:none;display:inline-block;text-align:center;}
+.feed-btn.wa{background:#25d366;border-color:#25d366;color:white;}
+.feed-btn:hover{opacity:.8;}
+.feed-empty{display:flex;flex-direction:column;align-items:center;justify-content:center;padding:60px 20px;text-align:center;}
+.feed-badge{display:inline-block;background:#e53e3e;color:white;border-radius:10px;font-size:10px;font-weight:700;padding:1px 6px;margin-left:4px;vertical-align:middle;line-height:1.4;}
 /* IDIOMA MODAL */
 .lang-group{display:flex;gap:8px;margin-top:2px;}
 .lang-opt{flex:1;display:flex;align-items:center;justify-content:center;gap:7px;background:var(--bg);border:1px solid var(--bd);border-radius:var(--rs);padding:9px 10px;font-size:13px;color:var(--tp);cursor:pointer;transition:border-color .15s;}
@@ -398,6 +413,7 @@ input:checked+.togslider:before{transform:translateX(16px);}
   <!-- NAV TABS -->
   <div id="main-nav" class="nav">
     <div class="nav-tab active" id="tab-clients"  onclick="switchTab('clients')">Miembros</div>
+    <div class="nav-tab"        id="tab-today"    onclick="switchTab('today')">Hoy<span id="feed-badge" class="feed-badge" style="display:none;"></span></div>
     <div class="nav-tab"        id="tab-camps"    onclick="switchTab('camps')">Campañas</div>
     <div class="nav-tab"        id="tab-benefits" onclick="switchTab('benefits')">Beneficios</div>
     <div class="nav-tab"        id="tab-map"      onclick="switchTab('map')">🗺 Mapa</div>
@@ -626,6 +642,13 @@ input:checked+.togslider:before{transform:translateX(16px);}
         </div>
       </div>
 
+    </div>
+  </div>
+
+  <!-- SCREEN: HOY -->
+  <div id="sy" class="screen">
+    <div id="sy-list" class="feed-wrap">
+      <div class="feed-empty"><div class="spinner"></div></div>
     </div>
   </div>
 
@@ -916,6 +939,7 @@ let benefitTemplates = [];
 let discoveryCoupons = [];
 let dewormAlertsMap  = {}; // wk_client_id → alert
 let dewormKeywords   = []; // [{id, keyword}, …]
+let previousTab      = "clients";
 let campCoupon       = null;
 let previewedClients = [];
 let editingBenId     = null;
@@ -1149,6 +1173,7 @@ async function loadAll() {
     renderBenefitTemplates();
     renderDiscoveryCoupons();
     renderDewormKeywords();
+    updateFeedBadge();
     document.getElementById("mc").textContent = clients.length + " miembro" + (clients.length !== 1 ? "s" : "");
     checkExpiringCoupons();
   } catch(e) {
@@ -1158,17 +1183,19 @@ async function loadAll() {
 
 // ── TABS ──────────────────────────────────────────────────
 function switchTab(tab) {
-  ["clients","camps","benefits","map"].forEach(t => {
+  ["clients","today","camps","benefits","map"].forEach(t => {
     document.getElementById("tab-" + t).classList.toggle("active", t === tab);
   });
   document.getElementById("ss").classList.toggle("active", tab === "clients");
+  document.getElementById("sy").classList.toggle("active", tab === "today");
   document.getElementById("sc").classList.toggle("active", tab === "camps");
   document.getElementById("sb").classList.toggle("active", tab === "benefits");
   document.getElementById("sm").classList.toggle("active", tab === "map");
   document.getElementById("fab").style.display = tab === "clients" ? "flex" : "none";
-  const titles = { clients: "Panel de fidelización", camps: "Campañas", benefits: "Beneficios", map: "Mapa de miembros" };
-  document.getElementById("tb-title").textContent = titles[tab];
-  if (tab === "map") renderMap();
+  const titles = { clients: "Panel de fidelización", today: "Acciones de hoy", camps: "Campañas", benefits: "Beneficios", map: "Mapa de miembros" };
+  document.getElementById("tb-title").textContent = titles[tab] || "";
+  if (tab === "map")   renderMap();
+  if (tab === "today") renderFeed();
 }
 
 // ── LISTA DE CLIENTES ─────────────────────────────────────
@@ -1336,7 +1363,8 @@ function openProfile(id) {
   document.getElementById("tb-profile").style.display = "flex";
   document.getElementById("main-nav").style.display   = "none";
   document.getElementById("fab").style.display        = "none";
-  ["ss","sc","sb","sm"].forEach(id => document.getElementById(id).classList.remove("active"));
+  previousTab = ["clients","today","camps","benefits","map"].find(t => document.getElementById("tab-" + t)?.classList.contains("active")) || "clients";
+  ["ss","sy","sc","sb","sm"].forEach(id => document.getElementById(id).classList.remove("active"));
   document.getElementById("sp").classList.add("active");
   loadWakymaPanel(c.phone);
   window.scrollTo(0, 0);
@@ -1492,7 +1520,7 @@ function goBack() {
   document.getElementById("tb-profile").style.display = "none";
   document.getElementById("main-nav").style.display   = "flex";
   document.getElementById("sp").classList.remove("active");
-  switchTab("clients");
+  switchTab(previousTab || "clients");
 }
 
 // ── ALTA MANUAL DE CLIENTE ────────────────────────────────
@@ -2465,6 +2493,173 @@ function sendAnnivWA() {
   const ta    = document.getElementById(isEu ? "anniv-msg-eu" : "anniv-msg-es");
   const msg   = encodeURIComponent(ta.value);
   window.open(`https://wa.me/${fp}?text=${msg}`, "_blank");
+}
+
+// ── FEED DE ACCIONES ─────────────────────────────────────
+
+function buildFeedItems() {
+  const now  = new Date();
+  const in3  = new Date(now.getTime() + 3  * 86400000);
+  const in7  = new Date(now.getTime() + 7  * 86400000);
+  const ago7 = new Date(now.getTime() - 7  * 86400000);
+  const items = [];
+
+  for (const c of clients) {
+    const firstName = c.name.split(" ")[0];
+    const rawPhone  = (c.phone || "").replace(/\D/g, "");
+    const fp        = rawPhone.startsWith("34") ? rawPhone : "34" + rawPhone;
+    const isEu      = c.language === "eu";
+
+    // 1 — Desparasitación
+    if (c.dewormAlert) {
+      const al      = c.dewormAlert;
+      const product = al.product_name || "antiparasitario";
+      const petPart = al.pet_name ? ` para ${al.pet_name}` : "";
+      const petEu   = al.pet_name ? ` (${al.pet_name}rentzat)` : "";
+      items.push({
+        priority: 10, type: "deworm", icon: "💊",
+        title: "Toca desparasitar",
+        subtitle: `${c.name} · ${product}`,
+        clientId: c.id, clientName: c.name, fp,
+        msgEs: `¡Hola ${firstName}! 💊 Han pasado los 2 meses y medio desde que compraste ${product}${petPart}. ¿Habéis podido hacer la desparasitación? Si necesitáis más producto, podéis pasaros por la clínica 🐾`,
+        msgEu: `Kaixo ${firstName}! 💊 2 hilabete eta erdi igaro dira ${product}${petEu} erosi zenuenetik. Desparasitazioa egin al duzue? Produktu gehiago behar baduzu, etorri klinikara 🐾`,
+        isEu, alertId: al.id, wkClientId: c.wk_client_id
+      });
+    }
+
+    // 2 — Cupones urgentes (≤3 días)
+    for (const b of (c.benefits || [])) {
+      if (b.status !== "active" || !b.expiry) continue;
+      const d = parseExpiry(b.expiry);
+      if (!d || d < now || d > in7) continue;
+      const daysLeft = Math.max(0, Math.ceil((d - now) / 86400000));
+      const urgent   = d <= in3;
+      items.push({
+        priority: urgent ? 20 : 50, type: "expiry", icon: "🎁",
+        title: urgent ? `¡Cupón caduca en ${daysLeft} día${daysLeft !== 1 ? "s" : ""}!` : `Cupón caduca en ${daysLeft} días`,
+        subtitle: `${c.name} · "${b.name}"`,
+        clientId: c.id, clientName: c.name, fp,
+        msgEs: `Hola ${firstName} 👋 Te recordamos que tienes disponible "${b.name}" en Familia Canexion, válido hasta ${b.expiry}. ¡No lo dejes sin usar! 🐾`,
+        msgEu: `Kaixo ${firstName} 👋 "${b.name}" oraindik erabilgarri duzu Canexion Familian, ${b.expiry} arte. Ez utzi erabili gabe! 🐾`,
+        isEu
+      });
+    }
+
+    // 3 — Aniversario
+    if (c.anniversaryWeek) {
+      const years = c.created_at ? Math.max(1, now.getFullYear() - new Date(c.created_at).getFullYear()) : 1;
+      const ySuf  = years === 1 ? "año" : "años";
+      items.push({
+        priority: 40, type: "anniversary", icon: "🎉",
+        title: `Aniversario — ${years} ${ySuf}`,
+        subtitle: c.name,
+        clientId: c.id, clientName: c.name, fp,
+        msgEs: `¡Hola ${firstName}! 🎉 Hoy hace ${years} ${ySuf} que eres parte de Familia Canexion. ¡Muchísimas gracias por tu confianza, es un placer tenerte con nosotros! 🐾`,
+        msgEu: `Kaixo ${firstName}! 🎉 Gaur ${years} urte bete dira Canexion Familiako kide zarela. Eskerrik asko gurekin egoteagatik, pozten gaitu zurekin izateak! 🐾`,
+        isEu
+      });
+    }
+
+    // 4 — Cumpleaños de mascota
+    if (c.birthdayWeek) {
+      const bPets  = (c.pets || []).filter(p => checkBirthdayWeek(p.pet_bday)).map(p => p.name);
+      const petStr = bPets.join(", ");
+      items.push({
+        priority: 45, type: "birthday", icon: "🎂",
+        title: `Cumpleaños de ${petStr}`,
+        subtitle: c.name,
+        clientId: c.id, clientName: c.name, fp,
+        msgEs: `¡Hola ${firstName}! 🎂 Esta semana es el cumpleaños de ${petStr} y desde Canexion queríamos felicitaros. ¡Que pase un gran día! 🐾`,
+        msgEu: `Kaixo ${firstName}! 🎂 Aste honetan ${petStr}ren urtebetetzea da eta Canexionetik zoriondu nahi genizuen. Egun handia izan dezala! 🐾`,
+        isEu
+      });
+    }
+
+    // 5 — Nuevo miembro esta semana
+    if (c.created_at && new Date(c.created_at) >= ago7) {
+      const petNames = (c.pets || []).map(p => p.name).filter(Boolean).join(", ");
+      items.push({
+        priority: 60, type: "new", icon: "✨",
+        title: "Nuevo miembro",
+        subtitle: c.name + (petNames ? ` · ${petNames}` : ""),
+        clientId: c.id, clientName: c.name, fp,
+        msgEs: `¡Hola ${firstName}! 👋 Bienvenido/a a Familia Canexion. Ya tienes acceso a todos tus beneficios. ¡Estamos encantados de tenerte con nosotros! 🐾`,
+        msgEu: `Kaixo ${firstName}! 👋 Ongi etorri Canexion Familiari. Zure onurak prest daude. Pozten gaitu zurekin izateak! 🐾`,
+        isEu
+      });
+    }
+  }
+
+  items.sort((a, b) => a.priority - b.priority || a.clientName.localeCompare(b.clientName));
+  return items;
+}
+
+function updateFeedBadge() {
+  const count = buildFeedItems().length;
+  const badge = document.getElementById("feed-badge");
+  if (!badge) return;
+  if (count > 0) {
+    badge.textContent   = count;
+    badge.style.display = "inline-block";
+  } else {
+    badge.style.display = "none";
+  }
+}
+
+function renderFeed() {
+  const items = buildFeedItems();
+  const el    = document.getElementById("sy-list");
+  if (!el) return;
+
+  updateFeedBadge();
+
+  if (!items.length) {
+    el.innerHTML = '<div class="feed-empty"><div style="font-size:40px">🎉</div><div style="font-size:15px;font-weight:600;color:var(--tp);margin-top:10px;">¡Todo al día!</div><div style="font-size:13px;color:var(--tm);margin-top:4px;">Sin acciones pendientes hoy</div></div>';
+    return;
+  }
+
+  const colors = { deworm:"#4caf50", expiry:"#e67e22", anniversary:"#9c27b0", birthday:"#f59e0b", new:"#2196f3" };
+
+  const today = new Date().toLocaleDateString("es-ES", { weekday:"long", day:"numeric", month:"long" });
+
+  el.innerHTML = `<div class="feed-date">${today} · ${items.length} acción${items.length !== 1 ? "es" : ""}</div>` +
+    items.map((item, i) => {
+      const color = colors[item.type] || "#888";
+      const msg   = encodeURIComponent(item.isEu ? item.msgEu : item.msgEs);
+      const waUrl = `https://wa.me/${item.fp}?text=${msg}`;
+      const dismissBtn = item.type === "deworm"
+        ? `<button class="feed-btn" onclick="feedDismissDeworm('${item.alertId}','${item.wkClientId}',${i})">✓ Enviado</button>`
+        : "";
+      return `<div class="feed-card" id="feed-card-${i}" style="border-left-color:${color}">
+        <div class="feed-icon">${item.icon}</div>
+        <div class="feed-body">
+          <div class="feed-title">${item.title}</div>
+          <div class="feed-sub">${item.subtitle}</div>
+        </div>
+        <div class="feed-actions">
+          <a class="feed-btn wa" href="${waUrl}" target="_blank">📱 WA</a>
+          <button class="feed-btn" onclick="openProfile('${item.clientId}')">👤 Ver</button>
+          ${dismissBtn}
+        </div>
+      </div>`;
+    }).join("");
+}
+
+async function feedDismissDeworm(alertId, wkClientId, cardIdx) {
+  try {
+    await sb("PATCH", "deworm_alerts", { filter: `id=eq.${alertId}`, body: { status: "sent" } });
+    delete dewormAlertsMap[String(wkClientId)];
+    const idx = clients.findIndex(c => String(c.wk_client_id) === String(wkClientId));
+    if (idx >= 0) clients[idx].dewormAlert = null;
+    const card = document.getElementById(`feed-card-${cardIdx}`);
+    if (card) { card.classList.add("dismissed"); setTimeout(() => card.remove(), 200); }
+    setTimeout(() => {
+      const remaining = document.querySelectorAll(".feed-card").length;
+      if (!remaining) renderFeed();
+      updateFeedBadge();
+    }, 250);
+    showToast("Marcado como enviado ✓");
+  } catch(e) { showToast("Error al guardar", true); }
 }
 
 function sendDewormWA() {
