@@ -1004,9 +1004,10 @@ function checkAnniversaryWeek(createdAt) {
   const d = new Date(createdAt);
   if (isNaN(d.getTime())) return false;
   const today = new Date();
+  if (today.getFullYear() - d.getFullYear() < 1) return false;
   const anniv = new Date(today.getFullYear(), d.getMonth(), d.getDate());
   const diff = (anniv - today) / (1000 * 60 * 60 * 24);
-  return diff >= -1 && diff <= 7; // ventana: ayer hasta 7 días
+  return diff >= -1 && diff <= 7;
 }
 
 function checkBirthdayWeek(petBday) {
@@ -1305,7 +1306,7 @@ function openProfile(id) {
 
     // Calcular años en el programa
     const years = c.created_at
-      ? Math.max(1, new Date().getFullYear() - new Date(c.created_at).getFullYear())
+      ? new Date().getFullYear() - new Date(c.created_at).getFullYear()
       : 1;
     const ySuffix = years === 1 ? "año" : "años";
 
@@ -2583,7 +2584,7 @@ function buildFeedItems() {
 
     // 3 — Aniversario
     if (c.anniversaryWeek) {
-      const years = c.created_at ? Math.max(1, now.getFullYear() - new Date(c.created_at).getFullYear()) : 1;
+      const years = c.created_at ? now.getFullYear() - new Date(c.created_at).getFullYear() : 1;
       const ySuf  = years === 1 ? "año" : "años";
       items.push({
         priority: 40, type: "anniversary", icon: "🎉",
