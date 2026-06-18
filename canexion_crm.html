@@ -984,6 +984,7 @@ let benefitTemplates = [];
 let discoveryCoupons = [];
 let dewormAlertsMap  = {}; // wk_client_id → alert
 let dewormKeywords   = []; // [{id, keyword}, …]
+let wkStatsMap       = {}; // wk_client_id → wk_client_stats row
 let previousTab      = "clients";
 let campCoupon       = null;
 let previewedClients = [];
@@ -1060,6 +1061,13 @@ function checkBirthdayDays(petBday, days) {
   const diff = (thisYear - today) / (1000*60*60*24);
   return diff >= -3 && diff <= days;
 }
+function daysSince(dateStr) {
+  if (!dateStr) return null;
+  const d = new Date(dateStr + (dateStr.includes("T") ? "" : "T12:00:00"));
+  if (isNaN(d.getTime())) return null;
+  return Math.floor((Date.now() - d.getTime()) / 86400000);
+}
+
 function getSinceMonths(since) {
   if (!since) return 0;
   const ms = ["ene","feb","mar","abr","may","jun","jul","ago","sep","oct","nov","dic"];
@@ -1120,7 +1128,8 @@ function mapClient(c) {
     address:           c.address || "",
     language:          c.language || "es",
     anniversaryWeek:   checkAnniversaryWeek(c.created_at),
-    dewormAlert:       (c.wk_client_id && dewormAlertsMap[String(c.wk_client_id)]) || null
+    dewormAlert:       (c.wk_client_id && dewormAlertsMap[String(c.wk_client_id)]) || null,
+    wkStats:           (c.wk_client_id && wkStatsMap[String(c.wk_client_id)]) || null
   };
 }
 
@@ -1197,17 +1206,20 @@ window.addEventListener("DOMContentLoaded", () => {
 async function loadAll() {
   try {
     const todayISO = new Date().toISOString().split("T")[0];
-    const [cd, cpd, btd, dcd, dad, dkd] = await Promise.all([
+    const [cd, cpd, btd, dcd, dad, dkd, wksd] = await Promise.all([
       sb("GET", "clients",           { order: "created_at.desc" }),
       sb("GET", "campaigns",         { order: "created_at.desc" }),
       sb("GET", "benefit_templates", { order: "order_index"     }),
       sb("GET", "discovery_coupons"),
       sb("GET", "deworm_alerts",   { filter: `status=eq.pending&reminder_date=lte.${todayISO}` }),
-      sb("GET", "deworm_keywords", { order: "keyword" })
+      sb("GET", "deworm_keywords", { order: "keyword" }),
+      sb("GET", "wk_client_stats")
     ]);
-    // Deworm data debe estar listo antes de mapClient
+    // Deworm y Wakyma stats deben estar listos antes de mapClient
     dewormAlertsMap = {};
-    (dad || []).forEach(a => { dewormAlertsMap[String(a.wk_client_id)] = a; });
+    (dad  || []).forEach(a => { dewormAlertsMap[String(a.wk_client_id)] = a; });
+    wkStatsMap = {};
+    (wksd || []).forEach(s => { wkStatsMap[String(s.wk_client_id)] = s; });
     dewormKeywords   = dkd || [];
     clients          = (cd  || []).map(mapClient);
     filtered         = [...clients];
@@ -1959,9 +1971,15 @@ const condFields = [
   { value:"sinceMonthsGt", label:"Miembro hace más de (meses)",   num:true, min:0, ph:"ej. 6" },
   { value:"sinceMonthsLt", label:"Miembro hace menos de (meses)", num:true, min:0, ph:"ej. 3" },
   { value:"postal_code",   label:"Código postal es",              ph:"ej. 20001" },
-  { value:"wkNoVisitDays", label:"Sin visita en X días (Wakyma)",  num:true, min:1,  ph:"ej. 90",  wk:true },
-  { value:"wkSpentGt",     label:"Gasto > X€ este año (Wakyma)",   num:true, min:0,  ph:"ej. 100", wk:true },
-  { value:"wkVisitsGe",    label:"Visitas este año ≥ X (Wakyma)",  num:true, min:1,  ph:"ej. 3",   wk:true },
+  { value:"wkNoVisitDays",   label:"Sin visita (total) en más de X días",      num:true, min:1,  ph:"ej. 90"  },
+  { value:"wkSpentGt",      label:"Gasto total histórico > X€",               num:true, min:0,  ph:"ej. 200" },
+  { value:"wkVisitsGe",     label:"Visitas totales ≥ X",                      num:true, min:1,  ph:"ej. 5"   },
+  { value:"wkShopGt",       label:"Gasto en tienda > X€",                     num:true, min:0,  ph:"ej. 100" },
+  { value:"wkVetGt",        label:"Gasto en veterinario > X€",                num:true, min:0,  ph:"ej. 100" },
+  { value:"wkGroomGt",      label:"Gasto en peluquería > X€",                 num:true, min:0,  ph:"ej. 50"  },
+  { value:"wkVetLastDays",  label:"Sin visita a veterinario en más de X días", num:true, min:1,  ph:"ej. 180" },
+  { value:"wkShopLastDays", label:"Sin visita a tienda en más de X días",      num:true, min:1,  ph:"ej. 90"  },
+  { value:"wkGroomLastDays",label:"Sin visita a peluquería en más de X días",  num:true, min:1,  ph:"ej. 60"  },
 ];
 
 // Crea el control de valor adecuado para el campo seleccionado
@@ -2012,15 +2030,34 @@ function getConditions() {
 
 function matchesConditions(client, conditions) {
   return conditions.every(cond => {
+    const s   = client.wkStats;
+    const v   = parseFloat(cond.value);
     switch(cond.field) {
-      case "species":       return client.pets.some(p => p.species === cond.value);
-      case "svc":           return client.svcArray.includes(cond.value);
-      case "petAgeGt":      return client.pets.some(p => (getPetAge(p.pet_bday)||0) > parseFloat(cond.value));
-      case "petAgeLt":      return client.pets.some(p => (getPetAge(p.pet_bday)||0) < parseFloat(cond.value));
-      case "birthdayDays":  return client.pets.some(p => checkBirthdayDays(p.pet_bday, parseInt(cond.value)));
-      case "sinceMonthsGt": return getSinceMonths(client.since) > parseInt(cond.value);
-      case "sinceMonthsLt": return getSinceMonths(client.since) < parseInt(cond.value);
-      case "postal_code":   return (client.postal_code || "") === cond.value;
+      case "species":        return client.pets.some(p => p.species === cond.value);
+      case "svc":            return client.svcArray.includes(cond.value);
+      case "petAgeGt":       return client.pets.some(p => (getPetAge(p.pet_bday)||0) > v);
+      case "petAgeLt":       return client.pets.some(p => (getPetAge(p.pet_bday)||0) < v);
+      case "birthdayDays":   return client.pets.some(p => checkBirthdayDays(p.pet_bday, parseInt(cond.value)));
+      case "sinceMonthsGt":  return getSinceMonths(client.since) > parseInt(cond.value);
+      case "sinceMonthsLt":  return getSinceMonths(client.since) < parseInt(cond.value);
+      case "postal_code":    return (client.postal_code || "") === cond.value;
+      // Wakyma stats (desde caché local — instantáneo)
+      case "wkShopGt":       return s && (s.tienda_total || 0) > v;
+      case "wkVetGt":        return s && (s.vet_total    || 0) > v;
+      case "wkGroomGt":      return s && (s.peluqueria_total || 0) > v;
+      case "wkSpentGt":      return s && ((s.tienda_total||0)+(s.vet_total||0)+(s.peluqueria_total||0)) > v;
+      case "wkVisitsGe":     return s && ((s.tienda_visits||0)+(s.vet_visits||0)+(s.peluqueria_visits||0)) >= v;
+      case "wkVetLastDays":  { const d = daysSince(s?.vet_last_visit);          return d !== null && d > v; }
+      case "wkShopLastDays": { const d = daysSince(s?.tienda_last_visit);       return d !== null && d > v; }
+      case "wkGroomLastDays":{ const d = daysSince(s?.peluqueria_last_visit);   return d !== null && d > v; }
+      case "wkNoVisitDays":  {
+        if (!s) return false;
+        const dates = [s.tienda_last_visit, s.vet_last_visit, s.peluqueria_last_visit].filter(Boolean);
+        if (!dates.length) return false;
+        const latest = dates.reduce((a, b) => new Date(a) > new Date(b) ? a : b);
+        const d = daysSince(latest);
+        return d !== null && d > v;
+      }
       default: return true;
     }
   });
@@ -2033,33 +2070,11 @@ function autoPreview() {
   _previewTimer = setTimeout(() => { runPreview(); }, 280);
 }
 
-async function runPreview() {
-  const conds     = getConditions();
-  const wkConds   = conds.filter(c => c.field.startsWith("wk"));
-  const baseConds = conds.filter(c => !c.field.startsWith("wk"));
+function runPreview() {
+  const conds = getConditions();
 
-  // Filtrado local (síncrono)
-  let candidates = clients.filter(c => matchesConditions(c, baseConds));
-
-  // Filtrado Wakyma (async, con caché)
-  if (wkConds.length) {
-    document.getElementById("prev-count").textContent = "…";
-    document.getElementById("prev-unit").textContent  = "consultando Wakyma";
-    const statsArr = await Promise.all(candidates.map(c => fetchWkStats(c.phone)));
-    candidates = candidates.filter((c, i) => {
-      const s = statsArr[i];
-      if (!s) return false;
-      return wkConds.every(cond => {
-        const v = parseFloat(cond.value);
-        switch(cond.field) {
-          case "wkNoVisitDays": return s.lastVisitDaysAgo !== null && s.lastVisitDaysAgo > v;
-          case "wkSpentGt":     return s.spentThisYear > v;
-          case "wkVisitsGe":    return s.visitsThisYear >= v;
-          default: return true;
-        }
-      });
-    });
-  }
+  // Todo el filtrado es síncrono — los stats de Wakyma vienen de caché local
+  let candidates = clients.filter(c => matchesConditions(c, conds));
 
   // Filtrar por consentimiento de comunicaciones comerciales (RGPD)
   const beforeConsent  = candidates.length;
@@ -2120,8 +2135,21 @@ async function launchCampaign() {
     renderCampaigns();
     renderList(filtered);
 
+    // Registrar destinatarios para tracking de envío
+    let sendsMap = {};
+    if (campId && recipientCount > 0) {
+      try {
+        const sendsPayload = previewedClients.map(c => ({
+          campaign_id: campId, client_id: c.id,
+          client_name: c.name, client_phone: c.phone
+        }));
+        const sendsResult = await sb("POST", "campaign_sends", { body: sendsPayload });
+        (sendsResult || []).forEach(s => { sendsMap[s.client_id] = s.id; });
+      } catch(e) { /* tracking opcional, no bloquea */ }
+    }
+
     if (recipientCount > 0) {
-      showWaList(previewedClients, campCoupon);
+      showWaList(previewedClients, campCoupon, sendsMap);
       btn.style.display = "none";
       showToast("Campaña lanzada — " + recipientCount + " miembro" + (recipientCount > 1 ? "s" : "") + " ✓");
     } else {
@@ -2132,14 +2160,25 @@ async function launchCampaign() {
   btn.disabled = false; btn.textContent = "Lanzar campaña";
 }
 
-function showWaList(list, coupon) {
-  document.getElementById("wa-section").style.display = "block";
+function showWaList(list, coupon, sendsMap = {}) {
+  const sec = document.getElementById("wa-section");
+  sec.style.display = "block";
   const fillVars = (t) => (t || "")
     .replace("[CUPON]",     coupon.name)
     .replace("[DESCUENTO]", coupon.desc)
     .replace("[CADUCIDAD]", coupon.expiry || "");
   const tplEs = fillVars(document.getElementById("wa-msg-template").value);
   const tplEu = fillVars(document.getElementById("wa-msg-template-eu").value);
+
+  // Cabecera con progreso
+  sec.querySelector("div[data-prog]")?.remove();
+  const progDiv = document.createElement("div");
+  progDiv.dataset.prog = "1";
+  progDiv.style.cssText = "font-size:12px;color:var(--tm);margin-bottom:8px;";
+  progDiv.id = "camp-progress";
+  progDiv.textContent = "0 de " + list.length + " enviados";
+  sec.insertBefore(progDiv, document.getElementById("wa-list"));
+
   document.getElementById("wa-list").innerHTML = list.map(c => {
     const phone     = (c.phone||"").toString().replace(/\D/g, "");
     const fullPhone = phone.startsWith("34") ? phone : "34"+phone;
@@ -2147,11 +2186,45 @@ function showWaList(list, coupon) {
     const tpl       = useEu ? tplEu : tplEs;
     const langTag   = c.language === "eu" ? ' <span style="font-size:10px;color:var(--pu);font-weight:500;">EUS</span>' : "";
     const msg       = encodeURIComponent(tpl.replace(/\[NOMBRE\]/g, c.name.split(" ")[0]));
+    const sendId    = sendsMap[c.id] || "";
+    const sentBtn   = sendId
+      ? `<button class="wa-sent-btn camp-act-btn" data-done="0" onclick="markCampSent('${sendId}',this)" style="font-size:11px;padding:4px 9px;">✓ Enviado</button>`
+      : "";
     return `<div class="wa-item">
       <div class="wa-info"><div class="wa-name">${c.name}${langTag}</div><div class="wa-phone">${c.phone}</div></div>
-      <a class="wa-btn" href="https://wa.me/${fullPhone}?text=${msg}" target="_blank">WhatsApp</a>
+      <div style="display:flex;gap:6px;align-items:center;">
+        <a class="wa-btn" href="https://wa.me/${fullPhone}?text=${msg}" target="_blank">📱 WA</a>
+        ${sentBtn}
+      </div>
     </div>`;
   }).join("");
+}
+
+async function markCampSent(sendId, btn) {
+  if (btn.dataset.done === "1") return;
+  btn.disabled = true;
+  try {
+    await sb("PATCH", "campaign_sends", {
+      filter: "id=eq." + sendId,
+      body: { status: "sent", sent_at: new Date().toISOString() }
+    });
+    btn.dataset.done    = "1";
+    btn.textContent     = "✓ Enviado";
+    btn.style.background = "#25d366";
+    btn.style.color      = "white";
+    btn.style.borderColor= "#25d366";
+    updateCampProgress();
+  } catch(e) {
+    btn.disabled = false;
+    showToast("Error al marcar: " + e.message, true);
+  }
+}
+
+function updateCampProgress() {
+  const total = document.querySelectorAll(".wa-sent-btn").length;
+  const sent  = document.querySelectorAll(".wa-sent-btn[data-done='1']").length;
+  const prog  = document.getElementById("camp-progress");
+  if (prog) prog.textContent = sent + " de " + total + " enviados";
 }
 
 // ── PLANTILLAS DE BENEFICIOS ──────────────────────────────
