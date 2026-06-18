@@ -592,8 +592,12 @@ input:checked+.togslider:before{transform:translateX(16px);}
     </div>
     <!-- Código postal -->
     <div class="sec" style="margin-top:12px;">
-      <div class="seclabel">Código postal</div>
-      <div class="pcval" id="pcp">—</div>
+      <div style="display:flex;align-items:center;margin-bottom:6px;">
+        <div class="seclabel" style="margin-bottom:0;">Código postal</div>
+        <button id="geo-reset-btn" onclick="resetClientCoords()" title="Recalcular posición en el mapa" style="margin-left:auto;background:none;border:1px solid var(--bd);border-radius:20px;padding:2px 9px;font-size:11px;color:var(--ts);cursor:pointer;font-family:'DM Sans',sans-serif;">📍 Reubicar</button>
+      </div>
+      <div id="pcp" style="font-size:13px;color:var(--tp);">—</div>
+      <div id="geo-status" style="font-size:11px;color:var(--tm);margin-top:3px;"></div>
     </div>
     <!-- Dirección -->
     <div class="sec" id="paddr-sec" style="margin-top:12px;display:none;">
@@ -1246,7 +1250,9 @@ function mapClient(c) {
     language:          c.language || "es",
     anniversaryWeek:   checkAnniversaryWeek(c.created_at),
     dewormAlert:       (c.wk_client_id && dewormAlertsMap[String(c.wk_client_id)]) || null,
-    wkStats:           (c.wk_client_id && wkStatsMap[String(c.wk_client_id)]) || null
+    wkStats:           (c.wk_client_id && wkStatsMap[String(c.wk_client_id)]) || null,
+    lat:               c.lat  || null,
+    lng:               c.lng  || null
   };
 }
 
@@ -1443,8 +1449,12 @@ function openProfile(id) {
     ? c.svcArray.map(s => `<span class="svc-tag">${svcMap[s] || s}</span>`).join("")
     : '<span style="font-size:13px;color:var(--tm);">—</span>';
 
-  // Código postal
+  // Código postal + estado geo
   document.getElementById("pcp").textContent = c.postal_code || "—";
+  const geoSt = document.getElementById("geo-status");
+  if (geoSt) geoSt.textContent = (c.lat && c.lng) ? "✓ Posición guardada en mapa" : (c.postal_code ? "Sin posición guardada — se geocodificará al abrir el mapa" : "Sin código postal");
+  const geoBtn = document.getElementById("geo-reset-btn");
+  if (geoBtn) geoBtn.style.display = (c.lat && c.lng) ? "" : "none";
 
   // Dirección
   const paddrSec = document.getElementById("paddr-sec");
@@ -3492,7 +3502,8 @@ async function geocodeCP(cp) {
   const headers = { "User-Agent": "FamiliaCanexion-CRM/1.0" };
   const queries = [
     `https://nominatim.openstreetmap.org/search?postalcode=${encodeURIComponent(key)}&countrycodes=es&format=json&limit=1`,
-    `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(key + ", Spain")}&format=json&limit=1&addressdetails=1`
+    `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(key + ", Gipuzkoa, Euskadi, España")}&format=json&limit=3`,
+    `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(key + ", País Vasco, España")}&format=json&limit=3`
   ];
   for (const url of queries) {
     try {
@@ -3503,10 +3514,37 @@ async function geocodeCP(cp) {
         return cpCache[key];
       }
     } catch(e) {}
-    await new Promise(r => setTimeout(r, 400));
+    await new Promise(r => setTimeout(r, 1100));
   }
   cpCache[key] = null;
   return null;
+}
+
+async function saveCoords(clientId, lat, lng) {
+  try {
+    await sb("PATCH", "clients", { filter: "id=eq." + clientId, body: { lat, lng } });
+    [clients, filtered].forEach(arr => {
+      const c = arr.find(x => x.id === clientId);
+      if (c) { c.lat = lat; c.lng = lng; }
+    });
+  } catch(e) {}
+}
+
+async function resetClientCoords() {
+  if (!current) return;
+  try {
+    await sb("PATCH", "clients", { filter: "id=eq." + current.id, body: { lat: null, lng: null } });
+    current.lat = null; current.lng = null;
+    [clients, filtered].forEach(arr => {
+      const c = arr.find(x => x.id === current.id);
+      if (c) { c.lat = null; c.lng = null; }
+    });
+    const geoSt  = document.getElementById("geo-status");
+    const geoBtn = document.getElementById("geo-reset-btn");
+    if (geoSt)  geoSt.textContent  = "Posición borrada — se geocodificará al abrir el mapa";
+    if (geoBtn) geoBtn.style.display = "none";
+    showToast("Posición borrada. Se recalculará en el mapa ✓");
+  } catch(e) { showToast("Error ✗"); }
 }
 
 function mapMarkerColor(c) {
@@ -3523,10 +3561,35 @@ function openProfileFromMap(id) {
   openProfile(id);
 }
 
+function placeMapMarker(c, lat, lng, bounds) {
+  const hasAddr = c.address && c.address.trim();
+  const jLat = lat + (hasAddr ? 0 : (Math.random() - 0.5) * 0.004);
+  const jLng = lng + (hasAddr ? 0 : (Math.random() - 0.5) * 0.004);
+  const color  = mapMarkerColor(c);
+  const petStr = c.pets.map(p => p.name).join(", ") || "—";
+  const locStr = hasAddr ? c.address : ("📮 " + c.postal_code);
+  const marker = L.circleMarker([jLat, jLng], {
+    radius: 9, fillColor: color, color: "#fff",
+    weight: 2, opacity: 1, fillOpacity: 0.88
+  });
+  marker.bindPopup(`
+    <div style="font-family:'DM Sans',sans-serif;min-width:170px;padding:2px 0;">
+      <div style="font-weight:500;font-size:14px;margin-bottom:4px;color:#1a2a1c;">${c.name}</div>
+      <div style="font-size:12px;color:#4a6050;margin-bottom:2px;">🐾 ${petStr}</div>
+      <div style="font-size:12px;color:#8aaa90;margin-bottom:8px;">${locStr}</div>
+      <button onclick="openProfileFromMap('${c.id}')"
+        style="width:100%;background:#2d6a35;color:white;border:none;border-radius:6px;padding:7px 0;font-size:12px;font-weight:500;cursor:pointer;font-family:'DM Sans',sans-serif;">
+        Ver perfil →
+      </button>
+    </div>
+  `);
+  marker.addTo(_markersLayer);
+  bounds.push([jLat, jLng]);
+}
+
 async function renderMap() {
   if (!document.getElementById("map-container")) return;
 
-  // Inicializar mapa una sola vez
   if (!_map) {
     _map = L.map("map-container").setView([43.32, -1.98], 12);
     L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
@@ -3538,79 +3601,51 @@ async function renderMap() {
 
   _markersLayer.clearLayers();
 
-  const withCP  = filtered.filter(c => c.postal_code && c.postal_code.trim());
-  const noCP    = filtered.length - withCP.length;
+  const noCP       = filtered.filter(c => !c.postal_code || !c.postal_code.trim()).length;
+  const mappable   = filtered.filter(c => c.postal_code && c.postal_code.trim());
+  const cached     = mappable.filter(c => c.lat && c.lng);
+  const needsGeo   = mappable.filter(c => !c.lat || !c.lng);
+  const statsEl    = document.getElementById("map-stats");
+  const bounds     = [];
 
-  const statsEl = document.getElementById("map-stats");
-  statsEl.innerHTML = `<span class="map-stat">🔍 Geocodificando ${withCP.length} miembros...</span>`;
+  const updateStats = (placed, pending) => {
+    const cpCount = {};
+    mappable.forEach(c => { const cp = c.postal_code.trim(); cpCount[cp] = (cpCount[cp]||0)+1; });
+    const topCPs = Object.entries(cpCount).sort((a,b)=>b[1]-a[1]).slice(0,3);
+    const failed = mappable.length - placed - pending;
+    statsEl.innerHTML =
+      `<span class="map-stat">📍 <strong>${placed}</strong> en mapa</span>` +
+      (pending  ? `<span class="map-stat" style="color:#9a6010;">🔍 geocodificando ${pending}...</span>` : "") +
+      (failed   ? `<span class="map-stat" style="color:#9a6010;">⚠ ${failed} sin ubicar</span>`         : "") +
+      (noCP     ? `<span class="map-stat" style="color:#9a6010;">⚠ ${noCP} sin CP</span>`               : "") +
+      topCPs.map(([cp,n]) => `<span class="map-stat">📮 ${cp}: <strong>${n}</strong></span>`).join("") +
+      `<div class="map-legend">
+        <span class="map-leg-item"><span class="map-leg-dot" style="background:#2d6a35;"></span>Miembro</span>
+        <span class="map-leg-item"><span class="map-leg-dot" style="background:#5a3a9a;"></span>Campaña activa</span>
+        <span class="map-leg-item"><span class="map-leg-dot" style="background:#e8a020;"></span>Cumpleaños</span>
+        <span class="map-leg-item"><span class="map-leg-dot" style="background:#e67e22;"></span>Caduca pronto</span>
+      </div>`;
+  };
 
-  // Pre-geocodificar CPs únicos (sin dirección) respetando rate limit Nominatim
-  const uniqueCPs = [...new Set(
-    withCP.filter(c => !c.address).map(c => c.postal_code.trim())
-  )].filter(cp => !(cp in cpCache));
-  for (const cp of uniqueCPs) {
-    await geocodeCP(cp);
-    await new Promise(r => setTimeout(r, 400));
-  }
-
-  // Geocodificar clientes con dirección (individualmente, caché propia)
-  for (const c of withCP.filter(c => c.address && c.address.trim())) {
-    await geocodeClient(c);
-    await new Promise(r => setTimeout(r, 400));
-  }
-
-  // Colocar marcadores
-  const bounds = [];
-  for (const c of withCP) {
-    const coord = await geocodeClient(c);
-    if (!coord) continue;
-    // Jitter solo si usa CP (sin dirección propia)
-    const hasAddr = c.address && c.address.trim();
-    const lat = coord.lat + (hasAddr ? 0 : (Math.random() - 0.5) * 0.005);
-    const lng = coord.lng + (hasAddr ? 0 : (Math.random() - 0.5) * 0.005);
-    const color = mapMarkerColor(c);
-    const petStr = c.pets.map(p => p.name).join(", ") || "—";
-    const locStr = hasAddr ? c.address : ("📮 " + c.postal_code);
-    const marker = L.circleMarker([lat, lng], {
-      radius: 9, fillColor: color, color: "#fff",
-      weight: 2, opacity: 1, fillOpacity: 0.88
-    });
-    marker.bindPopup(`
-      <div style="font-family:'DM Sans',sans-serif;min-width:170px;padding:2px 0;">
-        <div style="font-weight:500;font-size:14px;margin-bottom:4px;color:#1a2a1c;">${c.name}</div>
-        <div style="font-size:12px;color:#4a6050;margin-bottom:2px;">🐾 ${petStr}</div>
-        <div style="font-size:12px;color:#8aaa90;margin-bottom:8px;">${locStr}</div>
-        <button onclick="openProfileFromMap('${c.id}')"
-          style="width:100%;background:#2d6a35;color:white;border:none;border-radius:6px;padding:7px 0;font-size:12px;font-weight:500;cursor:pointer;font-family:'DM Sans',sans-serif;">
-          Ver perfil →
-        </button>
-      </div>
-    `);
-    marker.addTo(_markersLayer);
-    bounds.push([lat, lng]);
-  }
-
+  // Colocar inmediatamente los que ya tienen coordenadas guardadas
+  for (const c of cached) placeMapMarker(c, c.lat, c.lng, bounds);
   if (bounds.length) _map.fitBounds(bounds, { padding: [40, 40], maxZoom: 15 });
-
-  // Estadísticas por CP
-  const cpCount = {};
-  withCP.forEach(c => { const cp = c.postal_code.trim(); cpCount[cp] = (cpCount[cp]||0)+1; });
-  const topCPs = Object.entries(cpCount).sort((a,b)=>b[1]-a[1]).slice(0,3);
-
-  const failedGeo = withCP.length - bounds.length;
-  statsEl.innerHTML =
-    `<span class="map-stat">📍 <strong>${bounds.length}</strong> en mapa</span>` +
-    (noCP    ? `<span class="map-stat" style="color:#9a6010;">⚠ ${noCP} sin CP</span>` : "") +
-    (failedGeo ? `<span class="map-stat" style="color:#9a6010;">⚠ ${failedGeo} CP sin geocodificar</span>` : "") +
-    topCPs.map(([cp,n]) => `<span class="map-stat">📮 ${cp}: <strong>${n}</strong></span>`).join("") +
-    `<div class="map-legend">
-      <span class="map-leg-item"><span class="map-leg-dot" style="background:#2d6a35;"></span>Miembro</span>
-      <span class="map-leg-item"><span class="map-leg-dot" style="background:#5a3a9a;"></span>Campaña activa</span>
-      <span class="map-leg-item"><span class="map-leg-dot" style="background:#e8a020;"></span>Cumpleaños</span>
-      <span class="map-leg-item"><span class="map-leg-dot" style="background:#e67e22;"></span>Caduca pronto</span>
-    </div>`;
-
+  updateStats(bounds.length, needsGeo.length);
   setTimeout(() => _map && _map.invalidateSize(), 150);
+
+  // Geocodificar los que no tienen coordenadas, guardarlas en Supabase
+  for (const c of needsGeo) {
+    const coord = await geocodeClient(c);
+    if (coord) {
+      placeMapMarker(c, coord.lat, coord.lng, bounds);
+      _map.fitBounds(bounds, { padding: [40, 40], maxZoom: 15 });
+      saveCoords(c.id, coord.lat, coord.lng);
+    }
+    updateStats(bounds.length, needsGeo.indexOf(c) < needsGeo.length - 1 ? needsGeo.length - needsGeo.indexOf(c) - 1 : 0);
+    await new Promise(r => setTimeout(r, 1100));
+  }
+
+  updateStats(bounds.length, 0);
 }
 
 // ── MODALES ───────────────────────────────────────────────
