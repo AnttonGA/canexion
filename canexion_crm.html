@@ -595,6 +595,10 @@ input:checked+.togslider:before{transform:translateX(16px);}
           <div class="wk-stats-card-title">🏥 Veterinario</div>
           <div id="wk-stats-vet"></div>
         </div>
+        <div class="wk-stats-card" style="grid-column:1/-1;">
+          <div class="wk-stats-card-title">✂️ Peluquería</div>
+          <div id="wk-stats-groom" style="display:grid;grid-template-columns:repeat(4,1fr);gap:0 8px;"></div>
+        </div>
       </div>
     </div>
     <!-- Beneficios -->
@@ -1581,81 +1585,55 @@ async function loadClientStats(wkClientId, force = false) {
     }
 
     // Fetch all sales from Wakyma
+    // Clasificación por empleado (primer nombre en minúsculas)
+    const EMP_ROLE = {
+      "isabel":  "shop",
+      "alberto": "shop",
+      "sylvia":  "shop",
+      "ana":     "vet",
+      "naiara":  "vet",
+      "sara":    "grooming"
+    };
+
     const salesRes = await wk("/api/v3/sales?clientId=" + wkClientId);
     const sales    = Array.isArray(salesRes) ? salesRes : (salesRes.data || []);
-    console.log("[WK Stats] Lista ventas - ejemplo primer objeto:", sales[0]);
 
-    // Fetch details for up to 40 most recent sales to get product types
-    const recent  = [...sales]
-      .sort((a, b) => new Date(b.date || b.createdAt || 0) - new Date(a.date || a.createdAt || 0))
-      .slice(0, 40);
-    const details = await Promise.all(
-      recent.map(s => wk("/api/v3/sales/" + s.id).catch(() => null))
-    );
-    console.log("[WK Stats] Detalle venta - ejemplo primer objeto:", details[0]);
+    let shopTotal = 0,  shopVisits = 0,  shopLast  = null;
+    let vetTotal  = 0,  vetVisits  = 0,  vetLast   = null;
+    let groomTotal = 0, groomVisits = 0, groomLast = null;
 
-    let shopTotal = 0, shopVisits = 0, shopLast = null;
-    let vetTotal  = 0, vetVisits  = 0, vetLast  = null;
-    const shopCats = {}, vetCats = {};
+    const updLast = (cur, d) => (!d ? cur : (!cur || new Date(d) > new Date(cur) ? d : cur));
 
-    for (let i = 0; i < details.length; i++) {
-      const raw  = details[i];
-      if (!raw) continue;
-      // Wakyma wraps single-item responses in {success, data}
-      const det  = raw.data || raw;
-      const items    = det.details || det.items || det.lines || det.products || [];
-      const saleDate = det.createdAt || det.date || recent[i].createdAt || recent[i].date;
+    for (const sale of sales) {
+      const total   = parseFloat(sale.totalPriceWithTax || sale.totalPriceNoTax || 0);
+      const date    = sale.createdAt || sale.date;
+      const empKey  = (sale.employee?.name || "").toLowerCase().split(" ")[0];
+      const role    = EMP_ROLE[empKey] || "shop";
 
-      let saleShop = 0, saleVet = 0, hasShop = false, hasVet = false;
-
-      if (items.length) {
-        for (const item of items) {
-          const price   = parseFloat(item.unitPrice || 0) * parseFloat(item.quantity || 1);
-          // service !== null → vet (consulta, peluquería…); service === null → tienda (producto)
-          if (item.service !== null && item.service !== undefined) {
-            const catName = item.service?.name || item.service?.category?.name || "Servicio";
-            saleVet += price; hasVet = true;
-            vetCats[catName] = (vetCats[catName] || 0) + price;
-          } else {
-            const catName = item.product?.name || item.product?.category?.name || "Producto";
-            saleShop += price; hasShop = true;
-            shopCats[catName] = (shopCats[catName] || 0) + price;
-          }
-        }
-      } else {
-        // No line items: use sale total
-        const t = parseFloat(det.totalPriceWithTax || det.totalPriceNoTax || det.total || recent[i].totalPriceWithTax || 0);
-        saleShop += t; hasShop = true;
-      }
-
-      const sd = saleDate ? new Date(saleDate) : null;
-      if (hasShop) {
-        shopTotal += saleShop; shopVisits++;
-        if (sd && (!shopLast || sd > new Date(shopLast))) shopLast = saleDate;
-      }
-      if (hasVet) {
-        vetTotal += saleVet; vetVisits++;
-        if (sd && (!vetLast || sd > new Date(vetLast))) vetLast = saleDate;
-      }
+      if (role === "vet")      { vetTotal  += total; vetVisits++;   vetLast   = updLast(vetLast,   date); }
+      else if (role === "grooming") { groomTotal += total; groomVisits++; groomLast = updLast(groomLast, date); }
+      else                     { shopTotal += total; shopVisits++;  shopLast  = updLast(shopLast,  date); }
     }
 
-    const topN = (obj, n) =>
-      Object.entries(obj).sort((a, b) => b[1] - a[1]).slice(0, n)
-        .map(([name, total]) => ({ name, total }));
+    const fmtD = d => d ? d.toString().split("T")[0] : null;
 
     const statsRow = {
-      wk_client_id:          wkClientId,
-      tienda_total:          shopTotal,
-      tienda_visits:         shopVisits,
-      tienda_last_visit:     shopLast ? shopLast.toString().split("T")[0] : null,
-      tienda_avg:            shopVisits ? shopTotal / shopVisits : 0,
-      tienda_top_categories: topN(shopCats, 4),
-      vet_total:             vetTotal,
-      vet_visits:            vetVisits,
-      vet_last_visit:        vetLast ? vetLast.toString().split("T")[0] : null,
-      vet_avg:               vetVisits ? vetTotal / vetVisits : 0,
-      vet_top_categories:    topN(vetCats, 4),
-      last_synced:           new Date().toISOString()
+      wk_client_id:           wkClientId,
+      tienda_total:           shopTotal,
+      tienda_visits:          shopVisits,
+      tienda_last_visit:      fmtD(shopLast),
+      tienda_avg:             shopVisits  ? shopTotal  / shopVisits  : 0,
+      tienda_top_categories:  [],
+      vet_total:              vetTotal,
+      vet_visits:             vetVisits,
+      vet_last_visit:         fmtD(vetLast),
+      vet_avg:                vetVisits   ? vetTotal   / vetVisits   : 0,
+      vet_top_categories:     [],
+      peluqueria_total:       groomTotal,
+      peluqueria_visits:      groomVisits,
+      peluqueria_last_visit:  fmtD(groomLast),
+      peluqueria_avg:         groomVisits ? groomTotal / groomVisits : 0,
+      last_synced:            new Date().toISOString()
     };
 
     await sb("POST", "wk_client_stats", {
@@ -1685,27 +1663,15 @@ function renderClientStats(stats) {
     ? new Date(d + "T12:00:00").toLocaleDateString("es-ES", { day: "2-digit", month: "short", year: "numeric" })
     : "—";
 
-  const renderCard = (total, visits, last, avg, cats) => {
-    const catHtml = cats && cats.length
-      ? `<div class="wk-stat-cats">${cats.map(c =>
-          `<span class="wk-stat-cat"><span>${c.name}</span><b>${fmt(c.total)}</b></span>`).join("")}
-        </div>` : "";
-    return `
-      <div class="wk-stat-item"><span class="wk-stat-label">Total gastado</span><span class="wk-stat-val">${fmt(total)}</span></div>
-      <div class="wk-stat-item"><span class="wk-stat-label">Visitas</span><span class="wk-stat-val">${visits || 0}</span></div>
-      <div class="wk-stat-item"><span class="wk-stat-label">Última visita</span><span class="wk-stat-val">${fmtDate(last)}</span></div>
-      <div class="wk-stat-item"><span class="wk-stat-label">Gasto medio</span><span class="wk-stat-val">${fmt(avg)}</span></div>
-      ${catHtml}`;
-  };
+  const renderCard = (total, visits, last, avg) => `
+    <div class="wk-stat-item"><span class="wk-stat-label">Total gastado</span><span class="wk-stat-val">${fmt(total)}</span></div>
+    <div class="wk-stat-item"><span class="wk-stat-label">Visitas</span><span class="wk-stat-val">${visits || 0}</span></div>
+    <div class="wk-stat-item"><span class="wk-stat-label">Última visita</span><span class="wk-stat-val">${fmtDate(last)}</span></div>
+    <div class="wk-stat-item"><span class="wk-stat-label">Ticket medio</span><span class="wk-stat-val">${fmt(avg)}</span></div>`;
 
-  document.getElementById("wk-stats-shop").innerHTML = renderCard(
-    stats.tienda_total, stats.tienda_visits, stats.tienda_last_visit,
-    stats.tienda_avg, stats.tienda_top_categories
-  );
-  document.getElementById("wk-stats-vet").innerHTML = renderCard(
-    stats.vet_total, stats.vet_visits, stats.vet_last_visit,
-    stats.vet_avg, stats.vet_top_categories
-  );
+  document.getElementById("wk-stats-shop").innerHTML  = renderCard(stats.tienda_total,     stats.tienda_visits,     stats.tienda_last_visit,     stats.tienda_avg);
+  document.getElementById("wk-stats-vet").innerHTML   = renderCard(stats.vet_total,        stats.vet_visits,        stats.vet_last_visit,        stats.vet_avg);
+  document.getElementById("wk-stats-groom").innerHTML = renderCard(stats.peluqueria_total, stats.peluqueria_visits, stats.peluqueria_last_visit, stats.peluqueria_avg);
 }
 
 async function syncFromWakyma() {
