@@ -1599,43 +1599,33 @@ async function loadClientStats(wkClientId, force = false) {
     const shopCats = {}, vetCats = {};
 
     for (let i = 0; i < details.length; i++) {
-      const det   = details[i];
-      if (!det) continue;
-      const items    = det.items || det.lines || det.products || [];
-      const saleDate = det.date || det.createdAt || recent[i].date;
+      const raw  = details[i];
+      if (!raw) continue;
+      // Wakyma wraps single-item responses in {success, data}
+      const det  = raw.data || raw;
+      const items    = det.details || det.items || det.lines || det.products || [];
+      const saleDate = det.createdAt || det.date || recent[i].createdAt || recent[i].date;
 
       let saleShop = 0, saleVet = 0, hasShop = false, hasVet = false;
 
       if (items.length) {
         for (const item of items) {
-          const price   = parseFloat(item.total || item.price || item.amount || 0);
-          const catName = item.product?.category?.name || item.categoryName || item.category || "Otros";
-          const ptype   = item.type ?? item.product?.type;
-          if (ptype === 2) {
-            saleShop += price; hasShop = true;
-            shopCats[catName] = (shopCats[catName] || 0) + price;
-          } else if (ptype === 1) {
+          const price   = parseFloat(item.unitPrice || 0) * parseFloat(item.quantity || 1);
+          // service !== null → vet (consulta, peluquería…); service === null → tienda (producto)
+          if (item.service !== null && item.service !== undefined) {
+            const catName = item.service?.name || item.service?.category?.name || "Servicio";
             saleVet += price; hasVet = true;
             vetCats[catName] = (vetCats[catName] || 0) + price;
           } else {
-            // unknown type — classify by appointmentId
-            if (det.appointmentId || det.appointment_id) {
-              saleVet += price; hasVet = true;
-              vetCats[catName] = (vetCats[catName] || 0) + price;
-            } else {
-              saleShop += price; hasShop = true;
-              shopCats[catName] = (shopCats[catName] || 0) + price;
-            }
+            const catName = item.product?.name || item.product?.category?.name || "Producto";
+            saleShop += price; hasShop = true;
+            shopCats[catName] = (shopCats[catName] || 0) + price;
           }
         }
       } else {
         // No line items: use sale total
-        const t = parseFloat(det.total || det.amount || recent[i].total || 0);
-        if (det.appointmentId || det.appointment_id) {
-          saleVet += t; hasVet = true;
-        } else {
-          saleShop += t; hasShop = true;
-        }
+        const t = parseFloat(det.totalPriceWithTax || det.totalPriceNoTax || det.total || recent[i].totalPriceWithTax || 0);
+        saleShop += t; hasShop = true;
       }
 
       const sd = saleDate ? new Date(saleDate) : null;
@@ -1670,14 +1660,15 @@ async function loadClientStats(wkClientId, force = false) {
 
     await sb("POST", "wk_client_stats", {
       body:   statsRow,
-      prefer: "resolution=merge-duplicates,return=minimal"
+      prefer: "resolution=merge-duplicates,return=representation"
     });
 
     loading.style.display = "none";
     cards.style.display   = "";
     renderClientStats(statsRow);
   } catch(e) {
-    loading.textContent   = "No disponible";
+    console.error("[WK Stats] Error:", e);
+    loading.textContent = "Error: " + e.message;
   }
 }
 
