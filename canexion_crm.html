@@ -374,6 +374,18 @@ input:checked+.togslider:before{transform:translateX(16px);}
 .plan-foot-btn.danger{border-color:#d0a0a0;color:#9a2020;}
 .plan-foot-btn.danger:hover{background:#fdf0f0;}
 .plan-empty{font-size:13px;color:var(--tm);padding:2px 0 6px;}
+.plan-log-sec{padding:10px 13px 0;border-top:1px solid var(--bd);margin-top:4px;}
+.plan-log-hdr{display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;}
+.plan-log-title{font-family:'DM Mono',monospace;font-size:10px;font-weight:500;color:var(--tm);letter-spacing:.08em;text-transform:uppercase;}
+.plan-log-add{background:none;border:1px solid var(--bd);border-radius:20px;padding:3px 10px;font-family:'DM Sans',sans-serif;font-size:11px;color:var(--ts);cursor:pointer;}
+.plan-log-add:hover{border-color:var(--gs);color:var(--gm);}
+.plan-log-entry{background:var(--gg);border:1px solid var(--bd);border-radius:var(--rs);padding:9px 12px;margin-bottom:7px;position:relative;}
+.plan-log-date{font-family:'DM Mono',monospace;font-size:11px;color:var(--gm);font-weight:500;}
+.plan-log-weight{font-size:12px;font-weight:500;color:var(--tp);margin-left:8px;}
+.plan-log-notes{font-size:12px;color:var(--ts);margin-top:4px;line-height:1.4;}
+.plan-log-del{position:absolute;top:6px;right:8px;background:none;border:none;font-size:12px;color:var(--tm);cursor:pointer;padding:2px 4px;}
+.plan-log-del:hover{color:#9a2020;}
+.plan-log-empty{font-size:12px;color:var(--tm);padding:4px 0 8px;}
 /* FILTER CHIPS */
 .chips-row{padding:8px 20px 2px;display:flex;gap:5px;flex-wrap:wrap;}
 .chip{border:1px solid var(--bd);background:var(--sf);border-radius:20px;padding:5px 11px;font-size:11px;font-weight:500;color:var(--ts);cursor:pointer;white-space:nowrap;transition:all .15s;user-select:none;}
@@ -929,6 +941,27 @@ input:checked+.togslider:before{transform:translateX(16px);}
   </div>
 </div>
 
+<div class="overlay" id="modal-trimestre" onclick="closeModalOut(event,'modal-trimestre')">
+  <div class="msheet">
+    <div class="mhandle"></div>
+    <div class="mtitle">Control trimestral</div>
+    <div class="fg">
+      <label class="fl">Fecha</label>
+      <input class="fi" id="trim-date" type="date"/>
+    </div>
+    <div class="fg">
+      <label class="fl">Peso (kg)</label>
+      <input class="fi" id="trim-weight" type="number" step="0.1" placeholder="Ej. 12.5"/>
+    </div>
+    <div class="fg">
+      <label class="fl">Observaciones</label>
+      <textarea class="wa-tarea" id="trim-notes" placeholder="Evolución de la dieta, modificaciones, notas..." style="min-height:80px;"></textarea>
+    </div>
+    <button class="subbtn" onclick="saveTrimestreEntry()">Guardar control</button>
+    <span class="cancelink" onclick="closeModal('modal-trimestre')">Cancelar</span>
+  </div>
+</div>
+
 <div class="overlay" id="modal-plan" onclick="closeModalOut(event,'modal-plan')">
   <div class="msheet">
     <div class="mhandle"></div>
@@ -940,6 +973,7 @@ input:checked+.togslider:before{transform:translateX(16px);}
         <option value="cachorro">🐶 Plan Salud Cachorro — 239,90€</option>
         <option value="gatito">🐱 Plan Salud Gatito — 229,90€</option>
         <option value="senior">🐾 Plan Salud Senior — 209,90€</option>
+        <option value="nutricional">🥗 Plan Nutricional</option>
       </select>
     </div>
     <div class="fg">
@@ -1062,6 +1096,10 @@ const PLAN_TEMPLATES = {
   senior: {
     label: "Plan Salud Senior", emoji: "🐾", price: 209.90, annual: true,
     steps: ["Analítica completa (perfil geriátrico)","Consulta 1","Consulta 2","Radiografía columna torácica","Radiografía columna lumbar","Consulta artrosis / ecografía interna","Vaccicheck (test anticuerpos)","Plan nutricional adaptado"]
+  },
+  nutricional: {
+    label: "Plan Nutricional", emoji: "🥗", price: null, hasLog: true,
+    steps: ["Manos a la obra — cita con nutricionista","Seguimiento telefónico (30 días)"]
   }
 };
 let previousTab      = "clients";
@@ -1790,22 +1828,45 @@ function renderPlans(plans) {
 function renderPlanCard(plan, collapsed) {
   const tmpl = PLAN_TEMPLATES[plan.plan_type];
   if (!tmpl) return "";
-  const steps  = plan.steps || [];
-  const total  = steps.length;
-  const doneN  = steps.filter(s => s.done).length;
-  const pct    = total ? Math.round(doneN / total * 100) : 0;
-  const isAll  = doneN === total && total > 0;
-  const petLbl = plan.pet_name ? ` · ${plan.pet_name}` : "";
+  const steps    = plan.steps || [];
+  const log      = plan.log   || [];
+  const total    = steps.length;
+  const doneN    = steps.filter(s => s.done).length;
+  const pct      = total ? Math.round(doneN / total * 100) : 0;
+  const isAll    = doneN === total && total > 0;
+  const isNut    = plan.plan_type === "nutricional";
+  const petLbl   = plan.pet_name   ? ` · ${plan.pet_name}`                        : "";
   const startLbl = plan.started_at ? ` · Inicio: ${planDateFmt(plan.started_at)}` : "";
-  const pctClass = isAll ? "done" : doneN > 0 ? "partial" : "empty";
+  const badge    = isNut
+    ? `${doneN}/${total} · ${log.length} controles`
+    : `${doneN}/${total}`;
+  const pctClass  = isAll ? "done" : doneN > 0 ? "partial" : "empty";
   const bodyStyle = collapsed ? "display:none;" : "";
   const chevron   = collapsed ? "▸" : "▾";
+
   const footBtns =
     (isAll && plan.plan_type === "senior"
       ? `<button class="plan-foot-btn primary" onclick="renewSeniorPlan('${plan.id}')">Renovar ${new Date().getFullYear() + 1}</button>` : "") +
-    (isAll && plan.plan_type !== "senior"
+    (isAll && !isNut && plan.plan_type !== "senior"
       ? `<button class="plan-foot-btn" onclick="completePlan('${plan.id}')">✓ Completado</button>` : "") +
     `<button class="plan-foot-btn danger" style="margin-left:auto;" onclick="deletePlan('${plan.id}')">Eliminar</button>`;
+
+  const logHtml = isNut ? `
+    <div class="plan-log-sec">
+      <div class="plan-log-hdr">
+        <span class="plan-log-title">Controles trimestrales</span>
+        <button class="plan-log-add" onclick="openAddTrimestreModal('${plan.id}')">+ Añadir</button>
+      </div>
+      ${log.length
+        ? log.map((e, i) => `
+          <div class="plan-log-entry">
+            <button class="plan-log-del" onclick="deleteTrimestreEntry('${plan.id}',${i})">✕</button>
+            <span class="plan-log-date">${planDateFmt(e.date)}</span>
+            ${e.weight ? `<span class="plan-log-weight">${e.weight} kg</span>` : ""}
+            ${e.notes  ? `<div class="plan-log-notes">${e.notes}</div>` : ""}
+          </div>`).join("")
+        : `<div class="plan-log-empty">Sin controles registrados aún</div>`}
+    </div>` : "";
 
   return `<div class="plan-card" id="plan-card-${plan.id}">
     <div class="plan-card-hdr" onclick="togglePlanExpand('${plan.id}')">
@@ -1814,7 +1875,7 @@ function renderPlanCard(plan, collapsed) {
         <div class="plan-card-name">${tmpl.label}</div>
         <div class="plan-card-sub">${petLbl}${startLbl}</div>
       </div>
-      <span class="plan-card-pct ${pctClass}">${doneN}/${total}</span>
+      <span class="plan-card-pct ${pctClass}">${badge}</span>
       <span style="font-size:13px;color:var(--tm);margin-left:4px;">${chevron}</span>
     </div>
     <div class="plan-progress-bar"><div class="plan-progress-fill" style="width:${pct}%;"></div></div>
@@ -1827,6 +1888,7 @@ function renderPlanCard(plan, collapsed) {
             ${s.done_at ? `<div class="plan-step-date">${planDateFmt(s.done_at)}</div>` : ""}
           </div>`).join("")}
       </div>
+      ${logHtml}
       <div class="plan-card-foot">${footBtns}</div>
     </div>
   </div>`;
@@ -1851,13 +1913,60 @@ async function togglePlanStep(planId, stepIdx) {
     done:    !s.done,
     done_at: !s.done ? new Date().toISOString().slice(0, 10) : null
   });
-  plan.steps  = steps;
+  plan.steps = steps;
   const allDone = steps.every(s => s.done);
-  plan.status = allDone && plan.plan_type !== "senior" ? "completed" : "active";
+  const neverComplete = plan.plan_type === "senior" || plan.plan_type === "nutricional";
+  plan.status = allDone && !neverComplete ? "completed" : "active";
   try {
     await sb("PATCH", "client_plans", { filter: "id=eq." + planId, body: { steps, status: plan.status } });
     renderPlans(plans);
   } catch(e) { showToast("Error guardando ✗"); }
+}
+
+// Controles trimestrales (plan nutricional)
+let _trimestreTargetId = null;
+
+function openAddTrimestreModal(planId) {
+  _trimestreTargetId = planId;
+  const dt = document.getElementById("trim-date");
+  if (dt) dt.value = new Date().toISOString().slice(0, 10);
+  const w = document.getElementById("trim-weight");
+  if (w) w.value = "";
+  const n = document.getElementById("trim-notes");
+  if (n) n.value = "";
+  openModal("modal-trimestre");
+}
+
+async function saveTrimestreEntry() {
+  const planId = _trimestreTargetId;
+  const date   = document.getElementById("trim-date")?.value;
+  const weight = document.getElementById("trim-weight")?.value.trim();
+  const notes  = document.getElementById("trim-notes")?.value.trim();
+  if (!date || !planId) { showToast("Indica la fecha"); return; }
+  const plans = window._plansCache || [];
+  const plan  = plans.find(p => p.id === planId);
+  if (!plan) return;
+  const entry = { date, weight: weight || null, notes: notes || null };
+  const log   = [...(plan.log || []), entry].sort((a, b) => a.date < b.date ? 1 : -1);
+  plan.log = log;
+  try {
+    await sb("PATCH", "client_plans", { filter: "id=eq." + planId, body: { log } });
+    renderPlans(plans);
+    closeModal("modal-trimestre");
+    showToast("Control añadido ✓");
+  } catch(e) { showToast("Error guardando ✗"); }
+}
+
+async function deleteTrimestreEntry(planId, idx) {
+  const plans = window._plansCache || [];
+  const plan  = plans.find(p => p.id === planId);
+  if (!plan) return;
+  const log = (plan.log || []).filter((_, i) => i !== idx);
+  plan.log  = log;
+  try {
+    await sb("PATCH", "client_plans", { filter: "id=eq." + planId, body: { log } });
+    renderPlans(plans);
+  } catch(e) { showToast("Error ✗"); }
 }
 
 async function completePlan(planId) {
@@ -1937,7 +2046,8 @@ async function savePlan() {
     started_at: start,
     expires_at: type === "senior" ? new Date().getFullYear() + "-12-31" : null,
     status:     "active",
-    steps
+    steps,
+    log:        []
   };
   try {
     const [row] = await sb("POST", "client_plans", { body });
