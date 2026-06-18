@@ -1587,12 +1587,13 @@ async function loadClientStats(wkClientId, force = false) {
     // Fetch all sales from Wakyma
     // Clasificación por empleado (primer nombre en minúsculas)
     const EMP_ROLE = {
-      "isabel":  "shop",
-      "alberto": "shop",
-      "sylvia":  "shop",
-      "ana":     "vet",
-      "naiara":  "vet",
-      "sara":    "grooming"
+      "isabel":   "shop",
+      "alberto":  "shop",
+      "sylvia":   "shop",
+      "ana":      "vet",
+      "naiara":   "vet",
+      "onintza":  "vet",
+      "sara":     "grooming"
     };
 
     const salesRes = await wk("/api/v3/sales?clientId=" + wkClientId);
