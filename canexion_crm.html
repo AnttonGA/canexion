@@ -581,7 +581,10 @@ input:checked+.togslider:before{transform:translateX(16px);}
     </div>
     <!-- Stats Tienda / Veterinario -->
     <div class="wk-stats-sec" id="wk-stats-sec" style="display:none;">
-      <div class="seclabel" style="margin-bottom:8px;">Desglose de gasto</div>
+      <div style="display:flex;align-items:center;margin-bottom:8px;">
+        <div class="seclabel" style="margin-bottom:0;">Desglose de gasto</div>
+        <button class="camp-act-btn" onclick="forceRefreshStats()" style="margin-left:auto;font-size:11px;padding:4px 10px;">🔄 Refrescar</button>
+      </div>
       <span class="wk-stats-loading" id="wk-stats-loading" style="display:none;">Calculando estadísticas...</span>
       <div class="wk-stats-cards" id="wk-stats-cards" style="display:none;">
         <div class="wk-stats-card">
@@ -1552,31 +1555,35 @@ async function loadWakymaPanel(phone) {
   } catch(e) { loadEl.textContent = "No disponible"; }
 }
 
-async function loadClientStats(wkClientId) {
+async function loadClientStats(wkClientId, force = false) {
   const sec      = document.getElementById("wk-stats-sec");
   const loading  = document.getElementById("wk-stats-loading");
   const cards    = document.getElementById("wk-stats-cards");
   sec.style.display     = "";
   loading.style.display = "inline";
+  loading.textContent   = "Calculando estadísticas...";
   cards.style.display   = "none";
 
   try {
-    // Check Supabase cache
-    const cached = await sb("GET", "wk_client_stats", { filter: "wk_client_id=eq." + wkClientId });
-    const row = Array.isArray(cached) ? cached[0] : null;
-    const isStale = !row || !row.last_synced
-      || (Date.now() - new Date(row.last_synced).getTime()) > 24 * 60 * 60 * 1000;
+    // Check Supabase cache (skip if force refresh)
+    if (!force) {
+      const cached = await sb("GET", "wk_client_stats", { filter: "wk_client_id=eq." + wkClientId });
+      const row = Array.isArray(cached) ? cached[0] : null;
+      const isStale = !row || !row.last_synced
+        || (Date.now() - new Date(row.last_synced).getTime()) > 24 * 60 * 60 * 1000;
 
-    if (row && !isStale) {
-      loading.style.display = "none";
-      cards.style.display   = "";
-      renderClientStats(row);
-      return;
+      if (row && !isStale) {
+        loading.style.display = "none";
+        cards.style.display   = "";
+        renderClientStats(row);
+        return;
+      }
     }
 
     // Fetch all sales from Wakyma
     const salesRes = await wk("/api/v3/sales?clientId=" + wkClientId);
     const sales    = Array.isArray(salesRes) ? salesRes : (salesRes.data || []);
+    console.log("[WK Stats] Lista ventas - ejemplo primer objeto:", sales[0]);
 
     // Fetch details for up to 40 most recent sales to get product types
     const recent  = [...sales]
@@ -1585,6 +1592,7 @@ async function loadClientStats(wkClientId) {
     const details = await Promise.all(
       recent.map(s => wk("/api/v3/sales/" + s.id).catch(() => null))
     );
+    console.log("[WK Stats] Detalle venta - ejemplo primer objeto:", details[0]);
 
     let shopTotal = 0, shopVisits = 0, shopLast = null;
     let vetTotal  = 0, vetVisits  = 0, vetLast  = null;
@@ -1671,6 +1679,13 @@ async function loadClientStats(wkClientId) {
   } catch(e) {
     loading.textContent   = "No disponible";
   }
+}
+
+function forceRefreshStats() {
+  if (!current) return;
+  const wkId = current.wk_client_id;
+  if (!wkId) return;
+  loadClientStats(wkId, true);
 }
 
 function renderClientStats(stats) {
