@@ -334,6 +334,18 @@ input:checked+.togslider:before{transform:translateX(16px);}
 .wk-val{font-size:13px;font-weight:500;color:var(--tp);}
 .wk-val.warn{color:#9a6010;}
 .wk-badge{display:inline-block;font-size:10px;font-weight:500;padding:2px 7px;border-radius:20px;background:var(--ap);color:#9a6010;margin-top:3px;}
+/* WAKYMA STATS */
+.wk-stats-sec{padding:14px 20px 0;}
+.wk-stats-cards{display:grid;grid-template-columns:1fr 1fr;gap:10px;}
+.wk-stats-card{background:var(--sf);border:1px solid var(--bd);border-radius:var(--rs);padding:10px 13px;}
+.wk-stats-card-title{font-size:12px;font-weight:600;color:var(--tp);margin-bottom:8px;display:flex;align-items:center;gap:5px;}
+.wk-stat-item{display:flex;justify-content:space-between;align-items:baseline;gap:4px;margin-bottom:4px;}
+.wk-stat-label{font-size:11px;color:var(--tm);}
+.wk-stat-val{font-size:12px;font-weight:500;color:var(--tp);text-align:right;}
+.wk-stat-cats{margin-top:6px;border-top:1px solid var(--bd);padding-top:6px;display:flex;flex-direction:column;gap:3px;}
+.wk-stat-cat{font-size:10px;color:var(--ts);display:flex;justify-content:space-between;gap:4px;}
+.wk-stat-cat b{color:var(--tp);font-weight:500;}
+.wk-stats-loading{font-size:11px;color:var(--tm);padding:6px 0;}
 /* FILTER CHIPS */
 .chips-row{padding:8px 20px 2px;display:flex;gap:5px;flex-wrap:wrap;}
 .chip{border:1px solid var(--bd);background:var(--sf);border-radius:20px;padding:5px 11px;font-size:11px;font-weight:500;color:var(--ts);cursor:pointer;white-space:nowrap;transition:all .15s;user-select:none;}
@@ -566,6 +578,21 @@ input:checked+.togslider:before{transform:translateX(16px);}
         <button class="camp-act-btn" id="wk-sync-btn" onclick="syncFromWakyma()" style="margin-left:auto;font-size:11px;padding:4px 10px;">🔄 Sincronizar</button>
       </div>
       <div class="pgrid" id="wk-panel"></div>
+    </div>
+    <!-- Stats Tienda / Veterinario -->
+    <div class="wk-stats-sec" id="wk-stats-sec" style="display:none;">
+      <div class="seclabel" style="margin-bottom:8px;">Desglose de gasto</div>
+      <span class="wk-stats-loading" id="wk-stats-loading" style="display:none;">Calculando estadísticas...</span>
+      <div class="wk-stats-cards" id="wk-stats-cards" style="display:none;">
+        <div class="wk-stats-card">
+          <div class="wk-stats-card-title">🛒 Tienda</div>
+          <div id="wk-stats-shop"></div>
+        </div>
+        <div class="wk-stats-card">
+          <div class="wk-stats-card-title">🏥 Veterinario</div>
+          <div id="wk-stats-vet"></div>
+        </div>
+      </div>
     </div>
     <!-- Beneficios -->
     <div class="sec" style="margin-top:18px;">
@@ -968,7 +995,7 @@ async function sb(method, table, opts = {}) {
     "Authorization": "Bearer " + SUPABASE_KEY,
     "Content-Type":  "application/json"
   };
-  if (method === "POST" || method === "PATCH") h["Prefer"] = "return=representation";
+  if (method === "POST" || method === "PATCH") h["Prefer"] = opts.prefer || "return=representation";
   const r = await fetch(url, {
     method, headers: h,
     body: opts.body !== undefined ? JSON.stringify(opts.body) : undefined
@@ -1379,6 +1406,19 @@ function openProfile(id) {
   ["ss","sy","sc","sb","sm"].forEach(id => document.getElementById(id).classList.remove("active"));
   document.getElementById("sp").classList.add("active");
   loadWakymaPanel(c.phone);
+
+  // Stats tienda/vet
+  const statsSec = document.getElementById("wk-stats-sec");
+  if (c.wk_client_id) {
+    statsSec.style.display = "";
+    document.getElementById("wk-stats-loading").style.display = "inline";
+    document.getElementById("wk-stats-loading").textContent   = "Calculando estadísticas...";
+    document.getElementById("wk-stats-cards").style.display   = "none";
+    loadClientStats(c.wk_client_id);
+  } else {
+    statsSec.style.display = "none";
+  }
+
   window.scrollTo(0, 0);
 }
 
@@ -1484,6 +1524,156 @@ async function loadWakymaPanel(phone) {
       </div>`;
     loadEl.style.display = "none";
   } catch(e) { loadEl.textContent = "No disponible"; }
+}
+
+async function loadClientStats(wkClientId) {
+  const sec      = document.getElementById("wk-stats-sec");
+  const loading  = document.getElementById("wk-stats-loading");
+  const cards    = document.getElementById("wk-stats-cards");
+  sec.style.display     = "";
+  loading.style.display = "inline";
+  cards.style.display   = "none";
+
+  try {
+    // Check Supabase cache
+    const cached = await sb("GET", "wk_client_stats", { filter: "wk_client_id=eq." + wkClientId });
+    const row = Array.isArray(cached) ? cached[0] : null;
+    const isStale = !row || !row.last_synced
+      || (Date.now() - new Date(row.last_synced).getTime()) > 24 * 60 * 60 * 1000;
+
+    if (row && !isStale) {
+      loading.style.display = "none";
+      cards.style.display   = "";
+      renderClientStats(row);
+      return;
+    }
+
+    // Fetch all sales from Wakyma
+    const salesRes = await wk("/api/v3/sales?clientId=" + wkClientId);
+    const sales    = Array.isArray(salesRes) ? salesRes : (salesRes.data || []);
+
+    // Fetch details for up to 40 most recent sales to get product types
+    const recent  = [...sales]
+      .sort((a, b) => new Date(b.date || b.createdAt || 0) - new Date(a.date || a.createdAt || 0))
+      .slice(0, 40);
+    const details = await Promise.all(
+      recent.map(s => wk("/api/v3/sales/" + s.id).catch(() => null))
+    );
+
+    let shopTotal = 0, shopVisits = 0, shopLast = null;
+    let vetTotal  = 0, vetVisits  = 0, vetLast  = null;
+    const shopCats = {}, vetCats = {};
+
+    for (let i = 0; i < details.length; i++) {
+      const det   = details[i];
+      if (!det) continue;
+      const items    = det.items || det.lines || det.products || [];
+      const saleDate = det.date || det.createdAt || recent[i].date;
+
+      let saleShop = 0, saleVet = 0, hasShop = false, hasVet = false;
+
+      if (items.length) {
+        for (const item of items) {
+          const price   = parseFloat(item.total || item.price || item.amount || 0);
+          const catName = item.product?.category?.name || item.categoryName || item.category || "Otros";
+          const ptype   = item.type ?? item.product?.type;
+          if (ptype === 2) {
+            saleShop += price; hasShop = true;
+            shopCats[catName] = (shopCats[catName] || 0) + price;
+          } else if (ptype === 1) {
+            saleVet += price; hasVet = true;
+            vetCats[catName] = (vetCats[catName] || 0) + price;
+          } else {
+            // unknown type — classify by appointmentId
+            if (det.appointmentId || det.appointment_id) {
+              saleVet += price; hasVet = true;
+              vetCats[catName] = (vetCats[catName] || 0) + price;
+            } else {
+              saleShop += price; hasShop = true;
+              shopCats[catName] = (shopCats[catName] || 0) + price;
+            }
+          }
+        }
+      } else {
+        // No line items: use sale total
+        const t = parseFloat(det.total || det.amount || recent[i].total || 0);
+        if (det.appointmentId || det.appointment_id) {
+          saleVet += t; hasVet = true;
+        } else {
+          saleShop += t; hasShop = true;
+        }
+      }
+
+      const sd = saleDate ? new Date(saleDate) : null;
+      if (hasShop) {
+        shopTotal += saleShop; shopVisits++;
+        if (sd && (!shopLast || sd > new Date(shopLast))) shopLast = saleDate;
+      }
+      if (hasVet) {
+        vetTotal += saleVet; vetVisits++;
+        if (sd && (!vetLast || sd > new Date(vetLast))) vetLast = saleDate;
+      }
+    }
+
+    const topN = (obj, n) =>
+      Object.entries(obj).sort((a, b) => b[1] - a[1]).slice(0, n)
+        .map(([name, total]) => ({ name, total }));
+
+    const statsRow = {
+      wk_client_id:          wkClientId,
+      tienda_total:          shopTotal,
+      tienda_visits:         shopVisits,
+      tienda_last_visit:     shopLast ? shopLast.toString().split("T")[0] : null,
+      tienda_avg:            shopVisits ? shopTotal / shopVisits : 0,
+      tienda_top_categories: topN(shopCats, 4),
+      vet_total:             vetTotal,
+      vet_visits:            vetVisits,
+      vet_last_visit:        vetLast ? vetLast.toString().split("T")[0] : null,
+      vet_avg:               vetVisits ? vetTotal / vetVisits : 0,
+      vet_top_categories:    topN(vetCats, 4),
+      last_synced:           new Date().toISOString()
+    };
+
+    await sb("POST", "wk_client_stats", {
+      body:   statsRow,
+      prefer: "resolution=merge-duplicates,return=minimal"
+    });
+
+    loading.style.display = "none";
+    cards.style.display   = "";
+    renderClientStats(statsRow);
+  } catch(e) {
+    loading.textContent   = "No disponible";
+  }
+}
+
+function renderClientStats(stats) {
+  const fmt     = v => Number(v || 0).toFixed(2) + " €";
+  const fmtDate = d => d
+    ? new Date(d + "T12:00:00").toLocaleDateString("es-ES", { day: "2-digit", month: "short", year: "numeric" })
+    : "—";
+
+  const renderCard = (total, visits, last, avg, cats) => {
+    const catHtml = cats && cats.length
+      ? `<div class="wk-stat-cats">${cats.map(c =>
+          `<span class="wk-stat-cat"><span>${c.name}</span><b>${fmt(c.total)}</b></span>`).join("")}
+        </div>` : "";
+    return `
+      <div class="wk-stat-item"><span class="wk-stat-label">Total gastado</span><span class="wk-stat-val">${fmt(total)}</span></div>
+      <div class="wk-stat-item"><span class="wk-stat-label">Visitas</span><span class="wk-stat-val">${visits || 0}</span></div>
+      <div class="wk-stat-item"><span class="wk-stat-label">Última visita</span><span class="wk-stat-val">${fmtDate(last)}</span></div>
+      <div class="wk-stat-item"><span class="wk-stat-label">Gasto medio</span><span class="wk-stat-val">${fmt(avg)}</span></div>
+      ${catHtml}`;
+  };
+
+  document.getElementById("wk-stats-shop").innerHTML = renderCard(
+    stats.tienda_total, stats.tienda_visits, stats.tienda_last_visit,
+    stats.tienda_avg, stats.tienda_top_categories
+  );
+  document.getElementById("wk-stats-vet").innerHTML = renderCard(
+    stats.vet_total, stats.vet_visits, stats.vet_last_visit,
+    stats.vet_avg, stats.vet_top_categories
+  );
 }
 
 async function syncFromWakyma() {
