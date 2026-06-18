@@ -1523,6 +1523,32 @@ async function loadWakymaPanel(phone) {
         ${remN>0 ? '<div class="wk-badge">⚠ Revisar</div>' : ""}
       </div>`;
     loadEl.style.display = "none";
+
+    // Guardar wk_client_id automáticamente si no estaba guardado
+    const wkIdStr = String(wkId);
+    if (current && current.wk_client_id !== wkIdStr) {
+      current.wk_client_id = wkIdStr;
+      const idx = clients.findIndex(c => c.id === current.id);
+      if (idx >= 0) clients[idx].wk_client_id = wkIdStr;
+      sb("PATCH", "clients", { filter: "id=eq." + current.id, body: { wk_client_id: wkIdStr } }).catch(() => {});
+      // Actualizar cabecera del perfil
+      const psi = document.getElementById("psi");
+      if (psi) {
+        const since = current.since || "";
+        psi.innerHTML = "Miembro desde " + since +
+          ' &nbsp;<span style="background:rgba(200,230,203,.15);border:1px solid rgba(200,230,203,.25);padding:2px 8px;border-radius:20px;font-size:10px;color:rgba(200,230,203,.75);">⚡ Wakyma vinculado</span>';
+      }
+    }
+
+    // Cargar desglose de gasto
+    const statsSec = document.getElementById("wk-stats-sec");
+    if (statsSec) {
+      statsSec.style.display = "";
+      document.getElementById("wk-stats-loading").style.display = "inline";
+      document.getElementById("wk-stats-loading").textContent   = "Calculando estadísticas...";
+      document.getElementById("wk-stats-cards").style.display   = "none";
+      loadClientStats(wkIdStr);
+    }
   } catch(e) { loadEl.textContent = "No disponible"; }
 }
 
