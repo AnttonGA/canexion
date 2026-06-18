@@ -346,6 +346,34 @@ input:checked+.togslider:before{transform:translateX(16px);}
 .wk-stat-cat{font-size:10px;color:var(--ts);display:flex;justify-content:space-between;gap:4px;}
 .wk-stat-cat b{color:var(--tp);font-weight:500;}
 .wk-stats-loading{font-size:11px;color:var(--tm);padding:6px 0;}
+/* PLANES DE SALUD */
+.plan-card{background:var(--sf);border:1px solid var(--bd);border-radius:var(--rs);margin-bottom:8px;overflow:hidden;}
+.plan-card-hdr{display:flex;align-items:center;gap:8px;padding:11px 13px;cursor:pointer;user-select:none;}
+.plan-card-hdr:hover{background:var(--gg);}
+.plan-card-name{font-size:13px;font-weight:500;color:var(--tp);flex:1;}
+.plan-card-sub{font-size:11px;color:var(--tm);}
+.plan-card-pct{font-family:'DM Mono',monospace;font-size:10px;padding:2px 7px;border-radius:20px;white-space:nowrap;}
+.plan-card-pct.done{background:#e8f4ea;color:var(--gm);}
+.plan-card-pct.partial{background:var(--ap);color:#9a6010;}
+.plan-card-pct.empty{background:var(--gg);color:var(--tm);}
+.plan-progress-bar{height:3px;background:var(--bd);}
+.plan-progress-fill{height:100%;background:var(--gm);transition:width .3s;}
+.plan-steps{padding:4px 13px 0;}
+.plan-step-row{display:flex;align-items:flex-start;gap:9px;padding:6px 0;border-bottom:1px solid var(--bd);cursor:pointer;}
+.plan-step-row:last-child{border-bottom:none;}
+.plan-step-chk{width:16px;height:16px;border:1.5px solid var(--bd);border-radius:4px;flex-shrink:0;margin-top:1px;display:flex;align-items:center;justify-content:center;font-size:10px;transition:all .15s;}
+.plan-step-chk.done{background:var(--gm);border-color:var(--gm);color:white;}
+.plan-step-label{flex:1;font-size:12px;color:var(--tp);line-height:1.4;}
+.plan-step-label.done{text-decoration:line-through;color:var(--tm);}
+.plan-step-date{font-size:10px;color:var(--tm);font-family:'DM Mono',monospace;white-space:nowrap;margin-top:2px;}
+.plan-card-foot{padding:8px 13px 10px;display:flex;gap:8px;flex-wrap:wrap;border-top:1px solid var(--bd);margin-top:4px;}
+.plan-foot-btn{background:none;border:1px solid var(--bd);border-radius:var(--rs);padding:5px 11px;font-family:'DM Sans',sans-serif;font-size:11px;color:var(--ts);cursor:pointer;}
+.plan-foot-btn:hover{border-color:var(--gs);color:var(--gm);}
+.plan-foot-btn.primary{background:var(--gm);border-color:var(--gm);color:white;}
+.plan-foot-btn.primary:hover{background:var(--gd);}
+.plan-foot-btn.danger{border-color:#d0a0a0;color:#9a2020;}
+.plan-foot-btn.danger:hover{background:#fdf0f0;}
+.plan-empty{font-size:13px;color:var(--tm);padding:2px 0 6px;}
 /* FILTER CHIPS */
 .chips-row{padding:8px 20px 2px;display:flex;gap:5px;flex-wrap:wrap;}
 .chip{border:1px solid var(--bd);background:var(--sf);border-radius:20px;padding:5px 11px;font-size:11px;font-weight:500;color:var(--ts);cursor:pointer;white-space:nowrap;transition:all .15s;user-select:none;}
@@ -613,6 +641,14 @@ input:checked+.togslider:before{transform:translateX(16px);}
         <button class="doc-btn" onclick="sendDocWA('nutrition')">🥗 Plan Nutricional</button>
         <button class="doc-btn" onclick="sendDocWA('health')">🏥 Planes de Salud</button>
       </div>
+    </div>
+    <!-- Planes de Salud -->
+    <div class="sec" id="plans-sec" style="margin-top:18px;">
+      <div style="display:flex;align-items:center;margin-bottom:9px;">
+        <div class="seclabel" style="margin-bottom:0;">Planes de Salud</div>
+        <button class="camp-act-btn" onclick="openNewPlanModal()" style="margin-left:auto;font-size:11px;padding:4px 10px;">+ Contratar</button>
+      </div>
+      <div id="plans-list"><div class="plan-empty">Cargando...</div></div>
     </div>
     <!-- Notas -->
     <div class="sec" style="margin-top:18px;">
@@ -893,6 +929,34 @@ input:checked+.togslider:before{transform:translateX(16px);}
   </div>
 </div>
 
+<div class="overlay" id="modal-plan" onclick="closeModalOut(event,'modal-plan')">
+  <div class="msheet">
+    <div class="mhandle"></div>
+    <div class="mtitle">Contratar Plan de Salud</div>
+    <div class="fg">
+      <label class="fl">Tipo de plan</label>
+      <select class="fsel" id="plan-type-sel">
+        <option value="">— Selecciona un plan —</option>
+        <option value="cachorro">🐶 Plan Salud Cachorro — 239,90€</option>
+        <option value="gatito">🐱 Plan Salud Gatito — 229,90€</option>
+        <option value="senior">🐾 Plan Salud Senior — 209,90€</option>
+      </select>
+    </div>
+    <div class="fg">
+      <label class="fl">Mascota</label>
+      <select class="fsel" id="plan-pet-sel">
+        <option value="">— Sin especificar —</option>
+      </select>
+    </div>
+    <div class="fg">
+      <label class="fl">Fecha de inicio</label>
+      <input class="fi" id="plan-start-date" type="date"/>
+    </div>
+    <button class="subbtn" onclick="savePlan()">Activar plan</button>
+    <span class="cancelink" onclick="closeModal('modal-plan')">Cancelar</span>
+  </div>
+</div>
+
 <script>
 // ── CONFIGURACIÓN ─────────────────────────────────────────
 const SUPABASE_URL = "https://lhvaonkibrfujdbbhkkr.supabase.co";
@@ -985,6 +1049,21 @@ let discoveryCoupons = [];
 let dewormAlertsMap  = {}; // wk_client_id → alert
 let dewormKeywords   = []; // [{id, keyword}, …]
 let wkStatsMap       = {}; // wk_client_id → wk_client_stats row
+
+const PLAN_TEMPLATES = {
+  cachorro: {
+    label: "Plan Salud Cachorro", emoji: "🐶", price: 239.90,
+    steps: ["Coprologico pre-vacunal","Microchip + pasaporte + alta","Vacuna polivalente 1ª (2 meses)","Vacuna polivalente 2ª (3 meses)","Vacuna polivalente 3ª (4 meses)","Consejos alimentación y desparasitación","Vacuna antirrábica","Consulta de seguimiento 1","Consulta de seguimiento 2"]
+  },
+  gatito: {
+    label: "Plan Salud Gatito", emoji: "🐱", price: 229.90,
+    steps: ["Coprologico pre-vacunal","Microchip + pasaporte + alta","Vacuna trivalente 1ª (2 meses)","Vacuna trivalente 2ª (3 meses)","Vacuna trivalente 3ª (4 meses)","Test FIV + FeLV","Consejos alimentación y desparasitación","Analítica prequirúrgica"]
+  },
+  senior: {
+    label: "Plan Salud Senior", emoji: "🐾", price: 209.90, annual: true,
+    steps: ["Analítica completa (perfil geriátrico)","Consulta 1","Consulta 2","Radiografía columna torácica","Radiografía columna lumbar","Consulta artrosis / ecografía interna","Vaccicheck (test anticuerpos)","Plan nutricional adaptado"]
+  }
+};
 let previousTab      = "clients";
 let campCoupon       = null;
 let previewedClients = [];
@@ -1438,6 +1517,8 @@ function openProfile(id) {
     statsSec.style.display = "none";
   }
 
+  loadClientPlans(c.id);
+
   window.scrollTo(0, 0);
 }
 
@@ -1668,6 +1749,205 @@ function forceRefreshStats() {
   const wkId = current.wk_client_id;
   if (!wkId) return;
   loadClientStats(wkId, true);
+}
+
+// ── PLANES DE SALUD ────────────────────────────────────────
+function planDateFmt(d) {
+  if (!d) return "";
+  return new Date(d + "T12:00:00").toLocaleDateString("es-ES", { day: "2-digit", month: "short", year: "numeric" });
+}
+
+async function loadClientPlans(clientId) {
+  const el = document.getElementById("plans-list");
+  if (!el) return;
+  window._plansCache = [];
+  el.innerHTML = '<div class="plan-empty">Cargando...</div>';
+  try {
+    const rows = await sb("GET", "client_plans", { filter: "client_id=eq." + clientId + "&order=created_at.asc" });
+    window._plansCache = rows || [];
+    renderPlans(window._plansCache);
+  } catch(e) {
+    el.innerHTML = '<div class="plan-empty">Error cargando planes</div>';
+  }
+}
+
+function renderPlans(plans) {
+  const el = document.getElementById("plans-list");
+  if (!el) return;
+  const active = plans.filter(p => p.status === "active");
+  const done   = plans.filter(p => p.status !== "active");
+  if (!plans.length) {
+    el.innerHTML = '<div class="plan-empty">Sin planes de salud contratados</div>';
+    return;
+  }
+  el.innerHTML =
+    active.map(p => renderPlanCard(p, false)).join("") +
+    (done.length
+      ? `<div class="seclabel" style="margin-top:14px;margin-bottom:6px;">Completados / Anteriores</div>` + done.map(p => renderPlanCard(p, true)).join("")
+      : "");
+}
+
+function renderPlanCard(plan, collapsed) {
+  const tmpl = PLAN_TEMPLATES[plan.plan_type];
+  if (!tmpl) return "";
+  const steps  = plan.steps || [];
+  const total  = steps.length;
+  const doneN  = steps.filter(s => s.done).length;
+  const pct    = total ? Math.round(doneN / total * 100) : 0;
+  const isAll  = doneN === total && total > 0;
+  const petLbl = plan.pet_name ? ` · ${plan.pet_name}` : "";
+  const startLbl = plan.started_at ? ` · Inicio: ${planDateFmt(plan.started_at)}` : "";
+  const pctClass = isAll ? "done" : doneN > 0 ? "partial" : "empty";
+  const bodyStyle = collapsed ? "display:none;" : "";
+  const chevron   = collapsed ? "▸" : "▾";
+  const footBtns =
+    (isAll && plan.plan_type === "senior"
+      ? `<button class="plan-foot-btn primary" onclick="renewSeniorPlan('${plan.id}')">Renovar ${new Date().getFullYear() + 1}</button>` : "") +
+    (isAll && plan.plan_type !== "senior"
+      ? `<button class="plan-foot-btn" onclick="completePlan('${plan.id}')">✓ Completado</button>` : "") +
+    `<button class="plan-foot-btn danger" style="margin-left:auto;" onclick="deletePlan('${plan.id}')">Eliminar</button>`;
+
+  return `<div class="plan-card" id="plan-card-${plan.id}">
+    <div class="plan-card-hdr" onclick="togglePlanExpand('${plan.id}')">
+      <span style="font-size:16px;">${tmpl.emoji}</span>
+      <div style="flex:1;min-width:0;">
+        <div class="plan-card-name">${tmpl.label}</div>
+        <div class="plan-card-sub">${petLbl}${startLbl}</div>
+      </div>
+      <span class="plan-card-pct ${pctClass}">${doneN}/${total}</span>
+      <span style="font-size:13px;color:var(--tm);margin-left:4px;">${chevron}</span>
+    </div>
+    <div class="plan-progress-bar"><div class="plan-progress-fill" style="width:${pct}%;"></div></div>
+    <div id="plan-steps-${plan.id}" style="${bodyStyle}">
+      <div class="plan-steps">
+        ${steps.map((s, i) => `
+          <div class="plan-step-row" onclick="togglePlanStep('${plan.id}',${i})">
+            <div class="plan-step-chk ${s.done ? 'done' : ''}">${s.done ? "✓" : ""}</div>
+            <div class="plan-step-label ${s.done ? 'done' : ''}">${s.nombre || ""}</div>
+            ${s.done_at ? `<div class="plan-step-date">${planDateFmt(s.done_at)}</div>` : ""}
+          </div>`).join("")}
+      </div>
+      <div class="plan-card-foot">${footBtns}</div>
+    </div>
+  </div>`;
+}
+
+function togglePlanExpand(planId) {
+  const body = document.getElementById("plan-steps-" + planId);
+  if (!body) return;
+  const card   = document.getElementById("plan-card-" + planId);
+  const chev   = card?.querySelector(".plan-card-hdr span:last-child");
+  const isOpen = body.style.display !== "none";
+  body.style.display = isOpen ? "none" : "";
+  if (chev) chev.textContent = isOpen ? "▸" : "▾";
+}
+
+async function togglePlanStep(planId, stepIdx) {
+  const plans = window._plansCache || [];
+  const plan  = plans.find(p => p.id === planId);
+  if (!plan) return;
+  const steps = plan.steps.map((s, i) => i !== stepIdx ? s : {
+    ...s,
+    done:    !s.done,
+    done_at: !s.done ? new Date().toISOString().slice(0, 10) : null
+  });
+  plan.steps  = steps;
+  const allDone = steps.every(s => s.done);
+  plan.status = allDone && plan.plan_type !== "senior" ? "completed" : "active";
+  try {
+    await sb("PATCH", "client_plans", { filter: "id=eq." + planId, body: { steps, status: plan.status } });
+    renderPlans(plans);
+  } catch(e) { showToast("Error guardando ✗"); }
+}
+
+async function completePlan(planId) {
+  const plans = window._plansCache || [];
+  const plan  = plans.find(p => p.id === planId);
+  if (!plan) return;
+  plan.status = "completed";
+  try {
+    await sb("PATCH", "client_plans", { filter: "id=eq." + planId, body: { status: "completed" } });
+    renderPlans(plans);
+    showToast("Plan completado ✓");
+  } catch(e) { showToast("Error ✗"); }
+}
+
+async function renewSeniorPlan(planId) {
+  const plans = window._plansCache || [];
+  const plan  = plans.find(p => p.id === planId);
+  if (!plan) return;
+  const year    = new Date().getFullYear() + 1;
+  const newSteps = PLAN_TEMPLATES.senior.steps.map(n => ({ nombre: n, done: false, done_at: null }));
+  try {
+    await sb("PATCH", "client_plans", { filter: "id=eq." + planId, body: { status: "completed" } });
+    plan.status = "completed";
+    const [newPlan] = await sb("POST", "client_plans", { body: {
+      client_id:  plan.client_id,
+      plan_type:  "senior",
+      pet_name:   plan.pet_name,
+      started_at: year + "-01-01",
+      expires_at: year + "-12-31",
+      status:     "active",
+      steps:      newSteps
+    }});
+    if (newPlan) {
+      window._plansCache = [...plans, newPlan];
+      renderPlans(window._plansCache);
+      showToast("Plan renovado para " + year + " ✓");
+    }
+  } catch(e) { showToast("Error renovando ✗"); }
+}
+
+async function deletePlan(planId) {
+  if (!confirm("¿Eliminar este plan de salud?")) return;
+  try {
+    await sb("DELETE", "client_plans", { filter: "id=eq." + planId });
+    window._plansCache = (window._plansCache || []).filter(p => p.id !== planId);
+    renderPlans(window._plansCache);
+    showToast("Plan eliminado");
+  } catch(e) { showToast("Error ✗"); }
+}
+
+function openNewPlanModal() {
+  if (!current) return;
+  const sel = document.getElementById("plan-type-sel");
+  const pet = document.getElementById("plan-pet-sel");
+  const dt  = document.getElementById("plan-start-date");
+  if (sel) sel.value = "";
+  if (dt)  dt.value  = new Date().toISOString().slice(0, 10);
+  if (pet) {
+    pet.innerHTML = '<option value="">— Sin especificar —</option>' +
+      (current.pets || []).map(p => `<option value="${p.name}">${p.name}</option>`).join("");
+  }
+  openModal("modal-plan");
+}
+
+async function savePlan() {
+  const type  = document.getElementById("plan-type-sel")?.value;
+  const pet   = document.getElementById("plan-pet-sel")?.value || null;
+  const start = document.getElementById("plan-start-date")?.value || new Date().toISOString().slice(0, 10);
+  if (!type)    { showToast("Selecciona un tipo de plan"); return; }
+  if (!current) return;
+  const tmpl = PLAN_TEMPLATES[type];
+  const steps = tmpl.steps.map(n => ({ nombre: n, done: false, done_at: null }));
+  const body  = {
+    client_id:  current.id,
+    plan_type:  type,
+    pet_name:   pet,
+    started_at: start,
+    expires_at: type === "senior" ? new Date().getFullYear() + "-12-31" : null,
+    status:     "active",
+    steps
+  };
+  try {
+    const [row] = await sb("POST", "client_plans", { body });
+    if (row) {
+      window._plansCache = [...(window._plansCache || []), row];
+      renderPlans(window._plansCache);
+      closeModal("modal-plan");
+      showToast("Plan activado ✓");
+    }
+  } catch(e) { showToast("Error creando plan ✗"); }
 }
 
 function renderClientStats(stats) {
