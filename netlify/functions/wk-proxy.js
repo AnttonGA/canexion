@@ -8,7 +8,7 @@ exports.handler = async (event) => {
       headers: {
         "Access-Control-Allow-Origin":  "*",
         "Access-Control-Allow-Headers": "Content-Type",
-        "Access-Control-Allow-Methods": "GET, OPTIONS"
+        "Access-Control-Allow-Methods": "GET, POST, OPTIONS"
       },
       body: ""
     };
@@ -33,9 +33,15 @@ exports.handler = async (event) => {
   }
 
   try {
-    const r = await fetch("https://vets.wakyma.com" + endpoint, {
+    const fetchOpts = {
+      method:  event.httpMethod,
       headers: { "Authorization": "Bearer " + WAKYMA_KEY }
-    });
+    };
+    if (event.httpMethod === "POST" && event.body) {
+      fetchOpts.headers["Content-Type"] = "application/json";
+      fetchOpts.body = event.body;
+    }
+    const r = await fetch("https://vets.wakyma.com" + endpoint, fetchOpts);
     const text = await r.text();
     return {
       statusCode: r.status,
