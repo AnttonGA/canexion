@@ -2472,8 +2472,13 @@ function buildCondValueControl(field) {
 
 // Actualiza el control de valor al cambiar el campo seleccionado
 function updateCondValueInput(sel) {
-  const wrap = sel.parentNode.querySelector(".cond-val-wrap");
+  const wrap   = sel.parentNode.querySelector(".cond-val-wrap");
   wrap.innerHTML = buildCondValueControl(sel.value);
+  const newVal = wrap.querySelector(".cond-val");
+  if (newVal) {
+    newVal.addEventListener("input",  autoPreview);
+    newVal.addEventListener("change", autoPreview);
+  }
   autoPreview();
 }
 
