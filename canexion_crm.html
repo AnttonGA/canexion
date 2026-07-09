@@ -600,7 +600,7 @@ input:checked+.togslider:before{transform:translateX(16px);}
     <div class="fg"><label class="fl">Teléfono (WhatsApp) *</label><input class="fi" id="fph" type="tel" placeholder="6XX XXX XXX"/></div>
     <div class="fg"><label class="fl">Email (opcional)</label><input class="fi" id="fe" type="email" placeholder="email@ejemplo.com"/></div>
     <div class="fg"><label class="fl">Código postal *</label><input class="fi" id="fcp" type="text" placeholder="Ej. 20001" maxlength="10"/></div>
-    <div class="fg"><label class="fl">Dirección (opcional)</label><input class="fi" id="faddr" type="text" placeholder="Ej. Calle Mayor 12, 3ºA"/></div>
+    <div class="fg"><label class="fl">Dirección (opcional)</label><input class="fi" id="faddr" type="text" placeholder="Ej. Calle Mayor 12"/></div>
     <div class="fg">
       <label class="fl">Idioma de comunicación *</label>
       <div class="lang-group">
@@ -2386,49 +2386,115 @@ let _markersLayer = null;
 const cpCache   = {}; // cp → {lat,lng} | null
 const addrCache = {}; // "address_cp" → {lat,lng} | null
 
-async function geocodeClient(c) {
-  if (c.address && c.address.trim() && c.postal_code) {
-    const key = (c.address.trim() + "_" + c.postal_code.trim()).toLowerCase().replace(/\s+/g,"_");
-    if (key in addrCache) return addrCache[key];
-    try {
-      const q = encodeURIComponent(c.address.trim() + ", " + c.postal_code.trim() + ", Spain");
-      const r = await fetch(
-        `https://nominatim.openstreetmap.org/search?q=${q}&countrycodes=es&format=json&limit=1`,
-        { headers: { "User-Agent": "FamiliaCanexion-CRM/1.0" } }
-      );
+// Diccionario CP→municipio (Gipuzkoa). Solo CPs verificados; para el resto se
+// usa CP + provincia, que ya sitúa la localidad. No añadir mapeos dudosos.
+const CP_TOWNS = {
+  "20001":"Donostia-San Sebastián","20011":"Donostia-San Sebastián",
+  "20100":"Errenteria","20120":"Hernani","20140":"Andoain",
+  "20160":"Lasarte-Oria","20200":"Beasain","20250":"Arrasate",
+  "20270":"Bergara","20280":"Hondarribia","20300":"Irun",
+  "20400":"Tolosa","20600":"Eibar","20800":"Zarautz"
+};
+function townForCP(cp) {
+  return CP_TOWNS[(cp || "").replace(/\D/g, "").slice(0, 5)] || "";
+}
+
+// Limpia una dirección para geocodificar: expande abreviaturas y quita piso/puerta
+// (que hacen fallar al geocodificador). NO modifica el dato guardado del cliente.
+function cleanAddress(raw) {
+  if (!raw) return "";
+  // La parte anterior a la primera coma suele ser calle+número; lo de después, piso/puerta.
+  let s = raw.split(",")[0].trim();
+  s = s.replace(/\bC\/\s*/gi, "Calle ")
+       .replace(/\bAvda?\.?\s+/gi, "Avenida ")
+       .replace(/\bCtra\.?\s+/gi, "Carretera ")
+       .replace(/\bP[º°]\s+/gi, "Paseo ")
+       .replace(/\bPza?\.?\s+/gi, "Plaza ");
+  // Piso pegado sin coma: "12 3ºA", "12 2º izq"
+  s = s.replace(/\s+\d+\s*[ºª°]\s*[a-zA-Z]?\b.*$/, "");
+  // Indicadores de piso al final (no ambiguos con nombres de calle)
+  s = s.replace(/\s+\b(bajo|bj|entlo|entresuelo|atico|ático|piso|izq|izqda|izquierda|dcha|derecha)\b.*$/i, "");
+  return s.replace(/\s{2,}/g, " ").trim();
+}
+
+// Geocodificador de texto: prueba Photon (tolerante, sin clave) y, si falla,
+// Nominatim. Ambos gratuitos y públicos. Devuelve {lat,lng} o null.
+async function geocodeQuery(q) {
+  try {
+    const r = await fetch(
+      `https://photon.komoot.io/api/?q=${encodeURIComponent(q)}&limit=1&lang=es&lat=43.2&lon=-2.1`
+    );
+    if (r.ok) {
+      const d  = await r.json();
+      const co = d && d.features && d.features[0] && d.features[0].geometry
+                 && d.features[0].geometry.coordinates;
+      if (co && co.length === 2) return { lat: co[1], lng: co[0] };
+    }
+  } catch(e) {}
+  await new Promise(r => setTimeout(r, 300));
+  try {
+    const r = await fetch(
+      `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(q)}&countrycodes=es&format=json&limit=1`
+    );
+    if (r.ok) {
       const d = await r.json();
-      if (d && d.length) {
-        addrCache[key] = { lat: parseFloat(d[0].lat), lng: parseFloat(d[0].lon) };
-        return addrCache[key];
+      if (d && d.length) return { lat: parseFloat(d[0].lat), lng: parseFloat(d[0].lon) };
+    }
+  } catch(e) {}
+  return null;
+}
+
+async function geocodeClient(c) {
+  const cp = (c.postal_code || "").trim();
+  if (c.address && c.address.trim() && cp) {
+    const addr = cleanAddress(c.address);
+    const key  = (addr + "_" + cp).toLowerCase().replace(/\s+/g, "_");
+    if (key in addrCache) return addrCache[key];
+    const ctx = [townForCP(cp), cp, "Gipuzkoa, Euskadi, España"].filter(Boolean).join(", ");
+
+    // 1) Dirección limpia + municipio + CP + provincia
+    let coord = addr ? await geocodeQuery(`${addr}, ${ctx}`) : null;
+
+    // 2) Calle sin número (centro de la calle) si la dirección completa falla
+    if (!coord && addr) {
+      const street = addr.replace(/[\s,]+\d+\w*\s*$/, "").trim();
+      if (street && street !== addr) {
+        await new Promise(r => setTimeout(r, 300));
+        coord = await geocodeQuery(`${street}, ${ctx}`);
       }
-    } catch(e) {}
-    await new Promise(r => setTimeout(r, 400));
-    addrCache[key] = null;
+    }
+
+    addrCache[key] = coord || null;
+    if (coord) return coord;
+    // 3) Si no, cae al centro del CP (abajo)
   }
-  return c.postal_code ? geocodeCP(c.postal_code) : null;
+  return cp ? geocodeCP(cp) : null;
 }
 
 async function geocodeCP(cp) {
   const key = cp.replace(/\s/g, "");
   if (key in cpCache) return cpCache[key];
-  const headers = { "User-Agent": "FamiliaCanexion-CRM/1.0" };
-  const queries = [
-    `https://nominatim.openstreetmap.org/search?postalcode=${encodeURIComponent(key)}&countrycodes=es&format=json&limit=1`,
-    `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(key + ", Spain")}&format=json&limit=1&addressdetails=1`
-  ];
-  for (const url of queries) {
+  const ctx = [townForCP(key), key, "Gipuzkoa, Euskadi, España"].filter(Boolean).join(", ");
+
+  // Texto (Photon + Nominatim) con municipio si se conoce
+  let coord = await geocodeQuery(ctx);
+
+  // Último intento: búsqueda estructurada por código postal en Nominatim
+  if (!coord) {
+    await new Promise(r => setTimeout(r, 300));
     try {
-      const r = await fetch(url, { headers });
-      const d = await r.json();
-      if (d && d.length) {
-        cpCache[key] = { lat: parseFloat(d[0].lat), lng: parseFloat(d[0].lon) };
-        return cpCache[key];
+      const r = await fetch(
+        `https://nominatim.openstreetmap.org/search?postalcode=${encodeURIComponent(key)}&countrycodes=es&format=json&limit=1`
+      );
+      if (r.ok) {
+        const d = await r.json();
+        if (d && d.length) coord = { lat: parseFloat(d[0].lat), lng: parseFloat(d[0].lon) };
       }
     } catch(e) {}
-    await new Promise(r => setTimeout(r, 400));
   }
-  cpCache[key] = null;
-  return null;
+
+  cpCache[key] = coord || null;
+  return cpCache[key];
 }
 
 function mapMarkerColor(c) {
