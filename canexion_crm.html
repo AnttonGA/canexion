@@ -51,6 +51,10 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--tp);min-h
 .map-legend{display:flex;gap:14px;margin-left:auto;flex-wrap:wrap;}
 .map-leg-item{display:flex;align-items:center;gap:5px;font-size:11px;color:var(--ts);}
 .map-leg-dot{width:10px;height:10px;border-radius:50%;flex-shrink:0;}
+.map-stats-inner{display:flex;gap:14px;align-items:center;flex-wrap:wrap;flex:1;min-width:0;}
+.map-relocate-btn{flex-shrink:0;background:var(--gg);border:1px solid var(--bd);color:var(--gm);border-radius:var(--rs);padding:7px 12px;font-family:'DM Sans',sans-serif;font-size:12px;font-weight:500;cursor:pointer;transition:background .15s,border-color .15s;}
+.map-relocate-btn:hover{background:var(--gp);border-color:var(--gs);}
+.map-relocate-btn:disabled{opacity:.6;cursor:not-allowed;}
 #map-container{flex:1;min-height:0;}
 
 /* SEARCH / LIST */
@@ -753,8 +757,11 @@ input:checked+.togslider:before{transform:translateX(16px);}
 
   <!-- SCREEN: MAPA -->
   <div id="sm" class="screen">
-    <div class="map-stat-bar" id="map-stats">
-      <span class="map-stat">Cargando mapa...</span>
+    <div class="map-stat-bar">
+      <div id="map-stats" class="map-stats-inner">
+        <span class="map-stat">Cargando mapa...</span>
+      </div>
+      <button class="map-relocate-btn" onclick="relocateAllClients()" title="Borra las ubicaciones guardadas y recalcula todas con el motor actual">🔄 Reubicar todos</button>
     </div>
     <div id="map-container"></div>
   </div>
@@ -3793,6 +3800,29 @@ async function renderMap() {
   }
 
   updateStats(bounds.length, 0);
+}
+
+// Recalcula la ubicación de todos los miembros del mapa con el motor actual
+// (Photon + Nominatim). Borra las coordenadas guardadas de los miembros mostrados
+// para forzar el recálculo; renderMap vuelve a geocodificar y a guardarlas.
+async function relocateAllClients() {
+  const targets = filtered.filter(c => c.postal_code && c.postal_code.trim());
+  if (!targets.length) { showToast("No hay miembros con CP para ubicar"); return; }
+  if (!confirm(`¿Recalcular la ubicación de ${targets.length} miembros con el motor actual? Puede tardar un poco.`)) return;
+  const btn = document.querySelector(".map-relocate-btn");
+  if (btn) { btn.disabled = true; btn.textContent = "🔄 Reubicando..."; }
+  // Borrar coords en memoria (arrays y cachés) para que renderMap las recalcule
+  const idSet = new Set(targets.map(c => c.id));
+  [clients, filtered].forEach(arr => arr.forEach(c => { if (idSet.has(c.id)) { c.lat = null; c.lng = null; } }));
+  for (const k in cpCache)   delete cpCache[k];
+  for (const k in addrCache) delete addrCache[k];
+  try {
+    await renderMap(); // regeocodifica los que no tienen coords y guarda con saveCoords
+    showToast("Ubicaciones recalculadas ✓");
+  } catch(e) {
+    showToast("Error al reubicar ✗", true);
+  }
+  if (btn) { btn.disabled = false; btn.textContent = "🔄 Reubicar todos"; }
 }
 
 // ── MODALES ───────────────────────────────────────────────
