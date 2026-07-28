@@ -7,6 +7,7 @@
 <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <style>
 :root{--gd:#1a3a1f;--gm:#2d6a35;--gs:#4a9455;--gp:#c8e6cb;--gg:#f0f7f1;--am:#e8a020;--ap:#fef3dc;--tp:#1a2a1c;--ts:#4a6050;--tm:#8aaa90;--bd:#d4e8d8;--sf:#ffffff;--bg:#f5f8f5;--r:12px;--rs:8px;--pu:#5a3a9a;--pup:#ede8f4;}
 *{box-sizing:border-box;margin:0;padding:0;}
@@ -1008,6 +1009,10 @@ input:checked+.togslider:before{transform:translateX(16px);}
 // ── CONFIGURACIÓN ─────────────────────────────────────────
 const SUPABASE_URL = "https://lhvaonkibrfujdbbhkkr.supabase.co";
 const SUPABASE_KEY = "sb_publishable_wwY0Zcd-sxz5Gqr_NJ7zhg_5OkSiCU0";
+// Email de la cuenta de personal creada en Supabase → Authentication → Users.
+// DEBE coincidir EXACTAMENTE con ese usuario (cámbialo si usas otro email).
+const STAFF_EMAIL = "equipo@mekoavet.com";
+const SB_AUTH = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
 // ── WAKYMA ────────────────────────────────────────────────
 const WAKYMA_URL = "https://vets.wakyma.com";
@@ -1194,9 +1199,12 @@ async function sb(method, table, opts = {}) {
   if (opts.filter) qp.push(opts.filter);
   if (opts.order)  qp.push("order=" + opts.order);
   if (qp.length)   url += "?" + qp.join("&");
+  // Token de sesión del personal (Supabase Auth). Sin sesión → volver al login.
+  const { data: { session } } = await SB_AUTH.auth.getSession();
+  if (!session) { logout(); throw new Error("Sesión expirada"); }
   const h = {
     "apikey":        SUPABASE_KEY,
-    "Authorization": "Bearer " + SUPABASE_KEY,
+    "Authorization": "Bearer " + session.access_token,
     "Content-Type":  "application/json"
   };
   if (method === "POST" || method === "PATCH") h["Prefer"] = opts.prefer || "return=representation";
@@ -1204,6 +1212,7 @@ async function sb(method, table, opts = {}) {
     method, headers: h,
     body: opts.body !== undefined ? JSON.stringify(opts.body) : undefined
   });
+  if (r.status === 401) { logout(); throw new Error("No autorizado"); }
   if (!r.ok) throw new Error(await r.text());
   if (r.status === 204) return null;
   return r.json();
@@ -1372,13 +1381,8 @@ async function checkPwd() {
   const pw  = document.getElementById("pwd").value;
   btn.disabled = true; btn.textContent = "Verificando...";
   try {
-    const r = await fetch("/.netlify/functions/login", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ password: pw })
-    });
-    if (r.ok) {
-      sessionStorage.setItem(SESSION_KEY, "1");
+    const { error } = await SB_AUTH.auth.signInWithPassword({ email: STAFF_EMAIL, password: pw });
+    if (!error) {
       showApp();
     } else {
       document.getElementById("lerr").style.display = "block";
@@ -1389,15 +1393,16 @@ async function checkPwd() {
   }
   btn.disabled = false; btn.textContent = "Entrar";
 }
-function logout() { sessionStorage.removeItem(SESSION_KEY); location.reload(); }
+async function logout() { try { await SB_AUTH.auth.signOut(); } catch(e) {} location.reload(); }
 function showApp() {
   document.getElementById("login-screen").style.display = "none";
   document.getElementById("app").style.display          = "block";
   document.getElementById("fab").style.display          = "flex";
   loadAll();
 }
-window.addEventListener("DOMContentLoaded", () => {
-  if (sessionStorage.getItem(SESSION_KEY) === "1") showApp();
+window.addEventListener("DOMContentLoaded", async () => {
+  const { data: { session } } = await SB_AUTH.auth.getSession();
+  if (session) showApp();
 });
 
 // ── CARGA INICIAL ─────────────────────────────────────────

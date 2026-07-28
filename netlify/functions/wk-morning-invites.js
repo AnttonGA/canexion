@@ -1,6 +1,7 @@
 const WAKYMA_KEY   = process.env.WAKYMA_KEY;
 const SUPABASE_URL = process.env.SUPABASE_URL;
-const SUPABASE_KEY = process.env.SUPABASE_KEY;
+// service_role si está configurada (ignora RLS); si no, la publishable (fallback seguro).
+const SUPABASE_KEY = process.env.SUPABASE_SERVICE_KEY || process.env.SUPABASE_KEY;
 
 async function wakyma(endpoint, opts = {}) {
   const r = await fetch("https://vets.wakyma.com" + endpoint, {

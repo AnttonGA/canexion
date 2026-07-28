@@ -11,7 +11,9 @@
 //   WAKYMA_KEY     → la API key de Wakyma
 
 const SUPABASE_URL = process.env.SUPABASE_URL;
-const SUPABASE_KEY = process.env.SUPABASE_KEY;
+// Usa la clave service_role (ignora RLS) si está configurada; si no, la publishable.
+// El fallback evita romper nada si la variable aún no existe en Netlify.
+const SUPABASE_KEY = process.env.SUPABASE_SERVICE_KEY || process.env.SUPABASE_KEY;
 const WAKYMA_KEY   = process.env.WAKYMA_KEY;
 
 // ── Supabase helper ───────────────────────────────────────
