@@ -1402,8 +1402,8 @@ function showApp() {
 function openProfileFromQuery() {
   const pid = new URLSearchParams(location.search).get("profile");
   if (!pid) return;
-  const id = /^\d+$/.test(pid) ? Number(pid) : pid;
-  if (clients.some(c => c.id === id)) openProfile(id);
+  // Los ids de cliente se guardan como string (ver mapClient), por eso se compara sin convertir.
+  if (clients.some(c => c.id === pid)) openProfile(pid);
 }
 window.addEventListener("DOMContentLoaded", () => {
   if (sessionStorage.getItem(SESSION_KEY) === "1") showApp();
