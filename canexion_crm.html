@@ -663,6 +663,7 @@ input:checked+.togslider:before{transform:translateX(16px);}
       <div class="doc-btns">
         <button class="doc-btn" onclick="sendDocWA('nutrition')">🥗 Plan Nutricional</button>
         <button class="doc-btn" onclick="sendDocWA('health')">🏥 Planes de Salud</button>
+        <button class="doc-btn" onclick="sendWelcomeCard(this)">📲 Bienvenida + tarjeta</button>
       </div>
     </div>
     <!-- Planes de Salud -->
@@ -1398,7 +1399,15 @@ function showApp() {
   document.getElementById("login-screen").style.display = "none";
   document.getElementById("app").style.display          = "block";
   document.getElementById("fab").style.display          = "flex";
-  loadAll();
+  loadAll().then(openProfileFromQuery);
+}
+// Si la URL trae ?profile=<id> (al escanear el QR de la tarjeta de socio),
+// abre directamente esa ficha una vez cargados los datos.
+function openProfileFromQuery() {
+  const pid = new URLSearchParams(location.search).get("profile");
+  if (!pid) return;
+  // Los ids de cliente se guardan como string (ver mapClient), por eso se compara sin convertir.
+  if (clients.some(c => c.id === pid)) openProfile(pid);
 }
 window.addEventListener("DOMContentLoaded", async () => {
   const { data: { session } } = await SB_AUTH.auth.getSession();
@@ -3277,6 +3286,40 @@ function sendDocWA(type) {
       : `¡Hola ${firstName}! 🏥 Te enviamos información sobre nuestros Planes de Salud para ${petES}. Puedes consultarlos aquí: ${url} 🐾 Si tienes cualquier duda, llámanos o pásate por la clínica.`;
   }
   window.open(`https://wa.me/${fp}?text=${encodeURIComponent(msg)}`, "_blank");
+}
+
+// Genera la tarjeta de socio en WalletWallet y abre WhatsApp con el mensaje de
+// bienvenida + el enlace para añadirla al móvil (Apple/Google Wallet).
+async function sendWelcomeCard(btn) {
+  const c = current;
+  if (!c) return;
+  const firstName = c.name.split(" ")[0];
+  const petName   = (c.pets || [])[0]?.name || "";
+  const phone     = (c.phone || "").replace(/\D/g, "");
+  const fp        = phone.startsWith("34") ? phone : "34" + phone;
+  const isEu      = c.language === "eu";
+  const profileUrl = location.origin + location.pathname + "?profile=" + c.id;
+  const old = btn ? btn.innerHTML : "";
+  if (btn) { btn.disabled = true; btn.innerHTML = "⏳ Generando..."; }
+  try {
+    const r = await fetch("/.netlify/functions/crear-pase", {
+      method:  "POST",
+      headers: { "Content-Type": "application/json" },
+      body:    JSON.stringify({ clientId: c.id, name: c.name, pet: petName, profileUrl })
+    });
+    const data = await r.json();
+    if (!r.ok || !data.shareUrl) throw new Error(data.error || "No se pudo crear la tarjeta");
+    const petES = petName || "tu mascota";
+    const petEU = petName || "zure maskota";
+    const msg = isEu
+      ? `Kaixo ${firstName}! 🐾 Ongi etorri Familia Canexionera! Hemen duzu zure bazkide-txartela mugikorrean gordetzeko: ${data.shareUrl} Erakutsi dendan ${petEU}rentzako onurez baliatzeko.`
+      : `¡Hola ${firstName}! 🐾 ¡Bienvenid@ a Familia Canexion! Aquí tienes tu tarjeta de socio para guardarla en el móvil: ${data.shareUrl} Muéstrala en tienda y disfruta de los beneficios para ${petES}.`;
+    window.open(`https://wa.me/${fp}?text=${encodeURIComponent(msg)}`, "_blank");
+    showToast("Tarjeta generada ✓ — revisa WhatsApp");
+  } catch(e) {
+    showToast("Error: " + e.message, true);
+  }
+  if (btn) { btn.disabled = false; btn.innerHTML = old; }
 }
 
 function sendAnnivWA() {
