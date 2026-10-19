@@ -1,6 +1,7 @@
 // Netlify Function: crea una tarjeta de socio en WalletWallet (Apple + Google Wallet)
 // y devuelve el enlace (shareUrl) para enviar al cliente por WhatsApp.
-// El QR de la tarjeta apunta al perfil del cliente en el CRM (profileUrl).
+// El codigo de barras (Code128) lleva el ID del socio como FCX-<id>, para
+// escanearlo con el lector de tienda y abrir su ficha en el CRM.
 //
 // Variable de entorno necesaria (Netlify → Site config → Environment variables):
 //   WALLETWALLET_KEY → la API key de WalletWallet (empieza por ww_live_...)
@@ -23,9 +24,9 @@ exports.handler = async (event) => {
   }
 
   try {
-    const { name, pet, profileUrl } = JSON.parse(event.body || "{}");
-    if (!name || !profileUrl) {
-      return { statusCode: 400, headers: cors, body: JSON.stringify({ error: "Faltan datos (name, profileUrl)" }) };
+    const { clientId, name, pet } = JSON.parse(event.body || "{}");
+    if (!name || !clientId) {
+      return { statusCode: 400, headers: cors, body: JSON.stringify({ error: "Faltan datos (name, clientId)" }) };
     }
 
     // Plan gratuito: solo presets de color y branding limitado (sin logo propio).
@@ -35,8 +36,8 @@ exports.handler = async (event) => {
       primaryFields:   [{ label: "Socio/a", value: name }],
       secondaryFields: [{ label: "Mascota", value: pet || "—" }],
       backFields:      [{ label: "Familia Canexion", value: "Tu tarjeta de socio/a. Muéstrala en tienda para disfrutar de tus beneficios." }],
-      barcodeValue:    profileUrl,  // el QR lleva al perfil del cliente en el CRM
-      barcodeFormat:   "QR"
+      barcodeValue:    "FCX-" + clientId,  // Code128 con el ID del socio (lector de tienda)
+      barcodeFormat:   "Code128"
     };
 
     const r = await fetch("https://api.walletwallet.dev/api/passes", {

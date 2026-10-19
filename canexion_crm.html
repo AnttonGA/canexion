@@ -488,6 +488,10 @@ input:checked+.togslider:before{transform:translateX(16px);}
         <span class="sicon">⌕</span>
         <input class="sinput" id="si" type="text" placeholder="Nombre, teléfono o mascota..." autocomplete="off" oninput="filterClients()"/>
       </div>
+      <div class="sbox" style="margin-top:8px;border-color:var(--gs);background:var(--gg);">
+        <span class="sicon">📷</span>
+        <input class="sinput" id="scan-box" type="text" placeholder="Escanear tarjeta de socio (lector)..." autocomplete="off" onkeydown="if(event.key==='Enter'){event.preventDefault();onScanCard();}"/>
+      </div>
     </div>
     <div class="legend">
       <div class="litem"><div class="ldot" style="background:var(--gs)"></div>Beneficios activos</div>
@@ -1502,6 +1506,19 @@ function renderList(list) {
 }
 
 function filterClients() { applyFilters(); }
+
+// Lector de tienda: al escanear el Code128 de la tarjeta (FCX-<id>) + Enter,
+// extrae el ID del socio y abre su ficha. Los ids se guardan como string.
+function onScanCard() {
+  const el  = document.getElementById("scan-box");
+  const raw = (el.value || "").trim();
+  el.value  = "";
+  const m = raw.match(/\d+/);
+  if (!m) return;
+  const id = m[0];
+  if (clients.some(c => c.id === id)) openProfile(id);
+  else showToast("Socio no encontrado: " + raw, true);
+}
 
 // ── PERFIL DE CLIENTE ─────────────────────────────────────
 function openProfile(id) {
