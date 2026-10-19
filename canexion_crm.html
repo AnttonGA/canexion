@@ -1541,6 +1541,34 @@ function onScanCard() {
   else showToast("Socio no encontrado: " + raw, true);
 }
 
+// Lector de tienda (GLOBAL): capta el Code128 FCX-<id> escaneado desde cualquier
+// pantalla del CRM, sin poner el cursor en la caja. Funciona en paralelo con la
+// caja de escaneo de Miembros. Solo reacciona a códigos que empiezan por "FCX-"
+// y distingue la ráfaga del escáner del tecleo humano (reinicia si hay pausa).
+(function initGlobalScanner() {
+  let buf = "", last = 0;
+  document.addEventListener("keydown", (e) => {
+    const app = document.getElementById("app");
+    if (!app || app.style.display === "none") return;   // solo con sesión abierta
+    const el = e.target;
+    if (el && (el.tagName === "INPUT" || el.tagName === "TEXTAREA" || el.isContentEditable)) return; // escribiendo: no interferir
+    const now = Date.now();
+    if (now - last > 80) buf = "";                       // pausa larga = tecleo humano
+    last = now;
+    if (e.key === "Enter") {
+      const m = buf.match(/FCX-?(\d+)/i);
+      buf = "";
+      if (!m) return;
+      e.preventDefault();
+      const id = m[1];
+      if (clients.some(c => c.id === id)) openProfile(id);
+      else showToast("Socio no encontrado: FCX-" + id, true);
+      return;
+    }
+    if (e.key.length === 1) buf += e.key;
+  });
+})();
+
 // ── PERFIL DE CLIENTE ─────────────────────────────────────
 function openProfile(id) {
   current = clients.find(c => c.id === id);
