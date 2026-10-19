@@ -246,6 +246,15 @@ input:checked+.togslider:before{transform:translateX(16px);}
 
 /* MODALS */
 .overlay{display:none;position:fixed;inset:0;background:rgba(10,20,12,.5);z-index:300;align-items:flex-end;justify-content:center;}
+.cobrar-btn{display:block;width:calc(100% - 40px);margin:12px 20px 0;background:var(--gm);color:#fff;border:none;border-radius:var(--rs);padding:12px;font-family:'DM Sans',sans-serif;font-size:14px;font-weight:500;cursor:pointer;}
+.cobrar-btn:hover{background:var(--gd);}
+.sale-sub{font-size:13px;color:var(--ts);margin-bottom:12px;}
+.sale-cards{display:flex;flex-direction:column;gap:10px;margin-bottom:16px;max-height:50vh;overflow-y:auto;}
+.sale-card{display:flex;align-items:center;gap:12px;background:var(--gg);border:1px solid var(--bd);border-radius:var(--rs);padding:12px 14px;}
+.sale-card-body{flex:1;}
+.sale-card-name{font-size:14px;font-weight:500;color:var(--tp);}
+.sale-pct{background:var(--gm);color:#fff;border-radius:20px;padding:1px 8px;font-size:12px;margin-left:4px;white-space:nowrap;}
+.sale-card-desc{font-size:12px;color:var(--tm);margin-top:2px;}
 .overlay.open{display:flex;}
 .msheet{background:var(--sf);border-radius:20px 20px 0 0;padding:22px 20px 40px;width:100%;max-width:560px;max-height:92vh;overflow-y:auto;}
 .mhandle{width:36px;height:4px;background:var(--bd);border-radius:2px;margin:0 auto 18px;}
@@ -557,6 +566,7 @@ input:checked+.togslider:before{transform:translateX(16px);}
       </div>
       <div class="psince" id="psi"></div>
     </div>
+    <button id="pcobrar" class="cobrar-btn" onclick="openSaleDiscounts()" style="display:none;">💶 Cobrar en Wakyma</button>
     <div id="pba" class="bdayalert" style="display:none;">
       <span style="font-size:18px">🎂</span>
       <span class="bdaytext">Esta semana es el cumpleaños de <strong id="pbp"></strong></span>
@@ -978,6 +988,17 @@ input:checked+.togslider:before{transform:translateX(16px);}
     </div>
     <button class="subbtn" onclick="saveTrimestreEntry()">Guardar control</button>
     <span class="cancelink" onclick="closeModal('modal-trimestre')">Cancelar</span>
+  </div>
+</div>
+
+<div class="overlay" id="modal-sale" onclick="closeModalOut(event,'modal-sale')">
+  <div class="msheet">
+    <div class="mhandle"></div>
+    <div class="mtitle">Descuentos para la venta</div>
+    <div id="sale-sub" class="sale-sub"></div>
+    <div id="sale-cards" class="sale-cards"></div>
+    <button class="subbtn" onclick="openWakymaSale()">Abrir venta en Wakyma →</button>
+    <span class="cancelink" onclick="closeModal('modal-sale')">Cerrar</span>
   </div>
 </div>
 
@@ -1537,6 +1558,10 @@ function openProfile(id) {
       ? ' &nbsp;<span style="background:rgba(200,230,203,.15);border:1px solid rgba(200,230,203,.25);padding:2px 8px;border-radius:20px;font-size:10px;color:rgba(200,230,203,.75);">⚡ Wakyma vinculado</span>'
       : ' &nbsp;<span style="opacity:.45;">· Sin vincular a Wakyma</span>');
 
+  // Botón "Cobrar en Wakyma" solo si el cliente está vinculado
+  const cobrarBtn = document.getElementById("pcobrar");
+  if (cobrarBtn) cobrarBtn.style.display = c.wk_client_id ? "" : "none";
+
   // Mascotas
   const svcMap = {clinica:"Clínica",tienda:"Tienda",peluqueria:"Peluquería"};
   document.getElementById("pets-profile").innerHTML = c.pets.map(p => `
@@ -1700,6 +1725,8 @@ async function canjear(i) {
   current.benefits[i].status = "used";
   current.benefits[i].dot    = "used";
   renderBenefitsProfile(current);
+  const saleModal = document.getElementById("modal-sale");
+  if (saleModal && saleModal.classList.contains("open")) renderSaleDiscountCards();
   const idx = clients.findIndex(c => c.id === current.id);
   if (idx >= 0) clients[idx].benefits = current.benefits;
   renderList(filtered);
@@ -1707,6 +1734,48 @@ async function canjear(i) {
     await sb("PATCH", "clients", { filter: "id=eq." + current.id, body: { benefits: current.benefits } });
     showToast("Beneficio canjeado ✓");
   } catch(e) { showToast("Error al guardar", true); }
+}
+
+// ── COBRAR EN WAKYMA: popup con descuentos de venta ───────
+// Muestra solo los descuentos que afectan al precio (cupones de descubrimiento,
+// descuentos de campaña y beneficios de bienvenida que sean % de descuento).
+function isSaleDiscount(b) {
+  if (!b || b.status !== "active") return false;        // solo disponibles
+  if (b.dot === "always" || b.status === "always") return false; // perks informativos fuera
+  if (b.discount) return true;                          // cupón de descubrimiento
+  if (b.dot === "campaign") return true;                // descuento de campaña
+  const txt = ((b.name || "") + " " + (b.desc || "")).toLowerCase();
+  return /%|descuento|dto|rebaja/.test(txt);            // beneficio de bienvenida con descuento
+}
+
+function openSaleDiscounts() {
+  if (!current || !current.wk_client_id) return;
+  renderSaleDiscountCards();
+  openModal("modal-sale");
+}
+
+function renderSaleDiscountCards() {
+  const c = current; if (!c) return;
+  const items = (c.benefits || []).map((b, i) => ({ b, i })).filter(x => isSaleDiscount(x.b));
+  document.getElementById("sale-sub").textContent = items.length
+    ? "Aplica estos descuentos en la venta de Wakyma:"
+    : "Este socio no tiene descuentos de venta disponibles.";
+  document.getElementById("sale-cards").innerHTML = items.map(x => {
+    const b   = x.b;
+    const pct = b.discount ? `<span class="sale-pct">${b.discount}</span>` : "";
+    return `<div class="sale-card">
+      <div class="sale-card-body">
+        <div class="sale-card-name">${b.name}${pct}</div>
+        <div class="sale-card-desc">${b.desc || ""}</div>
+      </div>
+      <button class="cbtn" onclick="canjear(${x.i})">Canjear</button>
+    </div>`;
+  }).join("");
+}
+
+function openWakymaSale() {
+  if (!current || !current.wk_client_id) return;
+  window.open("https://vets.wakyma.com/clientes/ventas?cliente=" + encodeURIComponent(current.wk_client_id), "_blank");
 }
 
 async function saveNote() {
