@@ -1556,7 +1556,7 @@ function onScanCard() {
     if (now - last > 80) buf = "";                       // pausa larga = tecleo humano
     last = now;
     if (e.key === "Enter") {
-      const m = buf.match(/FCX-?(\d+)/i);
+      const m = buf.match(/FCX\D*(\d+)/i);  // tolera cualquier separador (guion, ', espacio…)
       buf = "";
       if (!m) return;
       e.preventDefault();
