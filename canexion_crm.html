@@ -132,6 +132,16 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--tp);min-h
 .feed-btn:hover{opacity:.8;}
 .feed-result{cursor:pointer;font-family:'DM Sans',sans-serif;max-width:120px;}
 .feed-cap{display:inline-block;background:#fde8e8;color:#c0392b;border:1px solid #f5c6c6;border-radius:12px;padding:5px 10px;font-size:11px;font-weight:600;white-space:nowrap;text-align:center;}
+.hoy-head{display:flex;align-items:center;justify-content:space-between;padding:12px 16px 0;}
+.hoy-head-title{font-size:12px;font-weight:600;color:var(--tm);text-transform:uppercase;letter-spacing:.5px;}
+.hoy-tpl-btn{background:var(--gg);border:1px solid var(--bd);border-radius:12px;padding:6px 12px;font-family:'DM Sans',sans-serif;font-size:12px;font-weight:500;color:var(--tp);cursor:pointer;}
+.hoy-tpl-btn:hover{opacity:.8;}
+.tpl-block{border:1px solid var(--bd);border-radius:var(--rs);padding:10px 12px;margin-bottom:10px;}
+.tpl-block-title{font-size:13px;font-weight:600;color:var(--tp);margin-bottom:2px;}
+.tpl-vars{font-size:11px;color:var(--tm);margin-bottom:8px;}
+.tpl-vars code{background:var(--gg);border-radius:4px;padding:1px 4px;}
+.tpl-lang{font-size:11px;font-weight:600;color:var(--tm);margin:6px 0 2px;}
+.tpl-ta{width:100%;box-sizing:border-box;border:1px solid var(--bd);border-radius:8px;padding:8px;font-family:'DM Sans',sans-serif;font-size:12px;resize:vertical;color:var(--tp);background:var(--sf);}
 .feed-empty{display:flex;flex-direction:column;align-items:center;justify-content:center;padding:60px 20px;text-align:center;}
 .feed-badge{display:inline-block;background:#e53e3e;color:white;border-radius:10px;font-size:10px;font-weight:700;padding:1px 6px;margin-left:4px;vertical-align:middle;line-height:1.4;}
 /* IDIOMA MODAL */
@@ -789,6 +799,10 @@ input:checked+.togslider:before{transform:translateX(16px);}
 
   <!-- SCREEN: HOY -->
   <div id="sy" class="screen">
+    <div class="hoy-head">
+      <span class="hoy-head-title">Acciones de hoy</span>
+      <button class="hoy-tpl-btn" onclick="openTemplatesModal()">⚙️ Plantillas</button>
+    </div>
     <div id="sy-list" class="feed-wrap">
       <div class="feed-empty"><div class="spinner"></div></div>
     </div>
@@ -1010,6 +1024,18 @@ input:checked+.togslider:before{transform:translateX(16px);}
     </div>
     <button class="subbtn" id="sbtn-disc" onclick="saveDisc()">Guardar cupón</button>
     <span class="cancelink" onclick="closeModal('modal-disc')">Cancelar</span>
+  </div>
+</div>
+
+<!-- ── MODAL: PLANTILLAS DE MENSAJES ──────────────────── -->
+<div class="overlay" id="modal-templates" onclick="closeModalOut(event,'modal-templates')">
+  <div class="msheet" style="max-height:88vh;overflow-y:auto;">
+    <div class="mhandle"></div>
+    <div class="mtitle">Plantillas de mensajes</div>
+    <div class="info-chip" style="margin-bottom:10px;">Los textos de los avisos de "Hoy". Usa las variables entre llaves; se rellenan solas al enviar.</div>
+    <div id="tpl-modal-body"></div>
+    <button class="subbtn" id="sbtn-tpl" onclick="saveTemplates()">Guardar plantillas</button>
+    <span class="cancelink" onclick="closeModal('modal-templates')">Cancelar</span>
   </div>
 </div>
 
@@ -1238,6 +1264,49 @@ let dewormKeywords   = []; // [{id, keyword}, …]
 let wkStatsMap       = {}; // wk_client_id → wk_client_stats row
 let msgLogByClient   = {}; // clients.id → [{aviso_type, result, created_at}] (últimos ~45 días)
 const MONTHLY_CAP    = 2;  // máx. mensajes/mes por socio (avisos + campañas + invitaciones)
+
+// Plantillas de mensajes de "Hoy". Editables desde el CRM (tabla templates); si no hay
+// override, se usan estos textos por defecto. Variables: {nombre} {producto} {mascota}
+// {cupon} {fecha} {anios}.
+let templatesMap = {}; // type → { es: texto, eu: texto }
+const DEFAULT_TEMPLATES = {
+  deworm: {
+    es: "¡Hola {nombre}! 💊 Han pasado los 2 meses y medio desde que compraste {producto}. ¿Habéis podido hacer la desparasitación? Si necesitáis más producto, podéis pasaros por la clínica 🐾",
+    eu: "Kaixo {nombre}! 💊 2 hilabete eta erdi igaro dira {producto} erosi zenuenetik. Desparasitazioa egin al duzue? Produktu gehiago behar baduzu, etorri klinikara 🐾"
+  },
+  recovery: {
+    es: "¡Hola {nombre}! 👋 Hace tiempo que no os vemos por Canexion y os echamos de menos 🐾 ¿Va todo bien con tu peludo? Si necesitáis cualquier cosa —pienso, una revisión, desparasitación...— aquí estamos. ¡Un abrazo!",
+    eu: "Kaixo {nombre}! 👋 Aspaldian ez zaituztegu Canexionen ikusi eta faltan botatzen zaituztegu 🐾 Dena ondo zure lagunarekin? Ezer behar baduzue —pentsua, errebisioa, desparasitazioa...— hemen gaude. Besarkada bat!"
+  },
+  expiry: {
+    es: "Hola {nombre} 👋 Te recordamos que tienes disponible \"{cupon}\" en Familia Canexion, válido hasta {fecha}. ¡No lo dejes sin usar! 🐾",
+    eu: "Kaixo {nombre} 👋 \"{cupon}\" oraindik erabilgarri duzu Canexion Familian, {fecha} arte. Ez utzi erabili gabe! 🐾"
+  },
+  anniversary: {
+    es: "¡Hola {nombre}! 🎉 Hoy hace {anios} que eres parte de Familia Canexion. ¡Muchísimas gracias por tu confianza, es un placer tenerte con nosotros! 🐾",
+    eu: "Kaixo {nombre}! 🎉 Gaur {anios} bete dira Canexion Familiako kide zarela. Eskerrik asko gurekin egoteagatik, pozten gaitu zurekin izateak! 🐾"
+  },
+  birthday: {
+    es: "¡Hola {nombre}! 🎂 Esta semana es el cumpleaños de {mascota} y desde Canexion queríamos felicitaros. ¡Que pase un gran día! 🐾",
+    eu: "Kaixo {nombre}! 🎂 Aste honetan {mascota}ren urtebetetzea da eta Canexionetik zoriondu nahi genizuen. Egun handia izan dezala! 🐾"
+  },
+  new: {
+    es: "¡Hola {nombre}! 👋 Bienvenido/a a Familia Canexion. Ya tienes acceso a todos tus beneficios. ¡Estamos encantados de tenerte con nosotros! 🐾",
+    eu: "Kaixo {nombre}! 👋 Ongi etorri Canexion Familiari. Zure onurak prest daude. Pozten gaitu zurekin izateak! 🐾"
+  }
+};
+const TEMPLATE_DEFS = [
+  { type: "deworm",      label: "💊 Desparasitación",     vars: "{nombre} {producto}" },
+  { type: "recovery",    label: "💜 Recuperación",        vars: "{nombre}" },
+  { type: "expiry",      label: "🎁 Cupón por caducar",   vars: "{nombre} {cupon} {fecha}" },
+  { type: "anniversary", label: "🎉 Aniversario",         vars: "{nombre} {anios}" },
+  { type: "birthday",    label: "🎂 Cumpleaños mascota",  vars: "{nombre} {mascota}" },
+  { type: "new",         label: "✨ Nuevo miembro",       vars: "{nombre}" }
+];
+function renderTemplate(type, lang, vars) {
+  const t = (templatesMap[type] && templatesMap[type][lang]) || (DEFAULT_TEMPLATES[type] && DEFAULT_TEMPLATES[type][lang]) || "";
+  return t.replace(/\{(\w+)\}/g, (_, k) => (vars && vars[k] != null) ? vars[k] : "");
+}
 
 const PLAN_TEMPLATES = {
   cachorro: {
@@ -1489,7 +1558,7 @@ async function loadAll() {
   try {
     const todayISO = new Date().toISOString().split("T")[0];
     const logSince = new Date(Date.now() - 45 * 86400000).toISOString();
-    const [cd, cpd, btd, dcd, dad, dkd, wksd, mld] = await Promise.all([
+    const [cd, cpd, btd, dcd, dad, dkd, wksd, mld, tpl] = await Promise.all([
       sb("GET", "clients",           { order: "created_at.desc" }),
       sb("GET", "campaigns",         { order: "created_at.desc" }),
       sb("GET", "benefit_templates", { order: "order_index"     }),
@@ -1497,10 +1566,13 @@ async function loadAll() {
       sb("GET", "deworm_alerts",   { filter: `status=eq.pending&reminder_date=lte.${todayISO}` }),
       sb("GET", "deworm_keywords", { order: "keyword" }),
       sb("GET", "wk_client_stats"),
-      sb("GET", "message_log",     { filter: `created_at=gte.${logSince}` }).catch(() => [])
+      sb("GET", "message_log",     { filter: `created_at=gte.${logSince}` }).catch(() => []),
+      sb("GET", "templates").catch(() => [])
     ]);
     msgLogByClient = {};
     (mld || []).forEach(m => { (msgLogByClient[String(m.client_id)] ||= []).push(m); });
+    templatesMap = {};
+    (tpl || []).forEach(t => { (templatesMap[t.type] ||= {})[t.language] = t.text; });
     // Deworm y Wakyma stats deben estar listos antes de mapClient
     dewormAlertsMap = {};
     (dad  || []).forEach(a => { dewormAlertsMap[String(a.wk_client_id)] = a; });
@@ -3636,15 +3708,13 @@ function buildFeedItems() {
     if (c.dewormAlert) {
       const al      = c.dewormAlert;
       const product = al.product_name || "antiparasitario";
-      const petPart = al.pet_name ? ` para ${al.pet_name}` : "";
-      const petEu   = al.pet_name ? ` (${al.pet_name}rentzat)` : "";
       items.push({
         priority: 10, type: "deworm", icon: "💊",
         title: "Toca desparasitar",
         subtitle: `${c.name} · ${product}`,
         clientId: c.id, clientName: c.name, fp,
-        msgEs: `¡Hola ${firstName}! 💊 Han pasado los 2 meses y medio desde que compraste ${product}${petPart}. ¿Habéis podido hacer la desparasitación? Si necesitáis más producto, podéis pasaros por la clínica 🐾`,
-        msgEu: `Kaixo ${firstName}! 💊 2 hilabete eta erdi igaro dira ${product}${petEu} erosi zenuenetik. Desparasitazioa egin al duzue? Produktu gehiago behar baduzu, etorri klinikara 🐾`,
+        msgEs: renderTemplate("deworm", "es", { nombre: firstName, producto: product }),
+        msgEu: renderTemplate("deworm", "eu", { nombre: firstName, producto: product }),
         isEu, alertId: al.id, wkClientId: c.wk_client_id
       });
     }
@@ -3658,8 +3728,8 @@ function buildFeedItems() {
           title: "Recuperar socio inactivo",
           subtitle: `${c.name}${c.last_activity ? ` · última actividad ${c.last_activity}` : ""}`,
           clientId: c.id, clientName: c.name, fp,
-          msgEs: `¡Hola ${firstName}! 👋 Hace tiempo que no os vemos por Canexion y os echamos de menos 🐾 ¿Va todo bien con tu peludo? Si necesitáis cualquier cosa —pienso, una revisión, desparasitación...— aquí estamos. ¡Un abrazo!`,
-          msgEu: `Kaixo ${firstName}! 👋 Aspaldian ez zaituztegu Canexionen ikusi eta faltan botatzen zaituztegu 🐾 Dena ondo zure lagunarekin? Ezer behar baduzue —pentsua, errebisioa, desparasitazioa...— hemen gaude. Besarkada bat!`,
+          msgEs: renderTemplate("recovery", "es", { nombre: firstName }),
+          msgEu: renderTemplate("recovery", "eu", { nombre: firstName }),
           isEu
         });
       }
@@ -3677,8 +3747,8 @@ function buildFeedItems() {
         title: urgent ? `¡Cupón caduca en ${daysLeft} día${daysLeft !== 1 ? "s" : ""}!` : `Cupón caduca en ${daysLeft} días`,
         subtitle: `${c.name} · "${b.name}"`,
         clientId: c.id, clientName: c.name, fp,
-        msgEs: `Hola ${firstName} 👋 Te recordamos que tienes disponible "${b.name}" en Familia Canexion, válido hasta ${b.expiry}. ¡No lo dejes sin usar! 🐾`,
-        msgEu: `Kaixo ${firstName} 👋 "${b.name}" oraindik erabilgarri duzu Canexion Familian, ${b.expiry} arte. Ez utzi erabili gabe! 🐾`,
+        msgEs: renderTemplate("expiry", "es", { nombre: firstName, cupon: b.name, fecha: b.expiry }),
+        msgEu: renderTemplate("expiry", "eu", { nombre: firstName, cupon: b.name, fecha: b.expiry }),
         isEu
       });
     }
@@ -3692,8 +3762,8 @@ function buildFeedItems() {
         title: `Aniversario — ${years} ${ySuf}`,
         subtitle: c.name,
         clientId: c.id, clientName: c.name, fp,
-        msgEs: `¡Hola ${firstName}! 🎉 Hoy hace ${years} ${ySuf} que eres parte de Familia Canexion. ¡Muchísimas gracias por tu confianza, es un placer tenerte con nosotros! 🐾`,
-        msgEu: `Kaixo ${firstName}! 🎉 Gaur ${years} urte bete dira Canexion Familiako kide zarela. Eskerrik asko gurekin egoteagatik, pozten gaitu zurekin izateak! 🐾`,
+        msgEs: renderTemplate("anniversary", "es", { nombre: firstName, anios: `${years} ${ySuf}` }),
+        msgEu: renderTemplate("anniversary", "eu", { nombre: firstName, anios: `${years} urte` }),
         isEu
       });
     }
@@ -3707,8 +3777,8 @@ function buildFeedItems() {
         title: `Cumpleaños de ${petStr}`,
         subtitle: c.name,
         clientId: c.id, clientName: c.name, fp,
-        msgEs: `¡Hola ${firstName}! 🎂 Esta semana es el cumpleaños de ${petStr} y desde Canexion queríamos felicitaros. ¡Que pase un gran día! 🐾`,
-        msgEu: `Kaixo ${firstName}! 🎂 Aste honetan ${petStr}ren urtebetetzea da eta Canexionetik zoriondu nahi genizuen. Egun handia izan dezala! 🐾`,
+        msgEs: renderTemplate("birthday", "es", { nombre: firstName, mascota: petStr }),
+        msgEu: renderTemplate("birthday", "eu", { nombre: firstName, mascota: petStr }),
         isEu
       });
     }
@@ -3721,8 +3791,8 @@ function buildFeedItems() {
         title: "Nuevo miembro",
         subtitle: c.name + (petNames ? ` · ${petNames}` : ""),
         clientId: c.id, clientName: c.name, fp,
-        msgEs: `¡Hola ${firstName}! 👋 Bienvenido/a a Familia Canexion. Ya tienes acceso a todos tus beneficios. ¡Estamos encantados de tenerte con nosotros! 🐾`,
-        msgEu: `Kaixo ${firstName}! 👋 Ongi etorri Canexion Familiari. Zure onurak prest daude. Pozten gaitu zurekin izateak! 🐾`,
+        msgEs: renderTemplate("new", "es", { nombre: firstName }),
+        msgEu: renderTemplate("new", "eu", { nombre: firstName }),
         isEu
       });
     }
@@ -3844,6 +3914,49 @@ async function logResult(clientId, type, result, cardIdx) {
     const labels = { enviado: "Enviado", ya_lo_tengo: "Ya lo tiene", preparamelo: "Prepáramelo", sin_respuesta: "Sin respuesta", baja: "Baja" };
     showToast((labels[result] || "Guardado") + " ✓");
   } catch(e) { showToast("Error al guardar", true); }
+}
+
+// ── PLANTILLAS EDITABLES ─────────────────────────────────
+function tplEsc(s) { return (s || "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;"); }
+
+function openTemplatesModal() {
+  const body = document.getElementById("tpl-modal-body");
+  body.innerHTML = TEMPLATE_DEFS.map(def => {
+    const es = (templatesMap[def.type] && templatesMap[def.type].es != null) ? templatesMap[def.type].es : DEFAULT_TEMPLATES[def.type].es;
+    const eu = (templatesMap[def.type] && templatesMap[def.type].eu != null) ? templatesMap[def.type].eu : DEFAULT_TEMPLATES[def.type].eu;
+    const varHtml = def.vars.split(" ").map(v => `<code>${v}</code>`).join(" ");
+    return `<div class="tpl-block">
+      <div class="tpl-block-title">${def.label}</div>
+      <div class="tpl-vars">Variables: ${varHtml}</div>
+      <div class="tpl-lang">🇪🇸 Castellano</div>
+      <textarea class="tpl-ta" id="tpl-${def.type}-es" rows="3">${tplEsc(es)}</textarea>
+      <div class="tpl-lang">🏔 Euskera</div>
+      <textarea class="tpl-ta" id="tpl-${def.type}-eu" rows="3">${tplEsc(eu)}</textarea>
+    </div>`;
+  }).join("");
+  openModal("modal-templates");
+}
+
+async function saveTemplates() {
+  const btn = document.getElementById("sbtn-tpl");
+  if (btn) { btn.disabled = true; btn.textContent = "Guardando..."; }
+  try {
+    const nowIso = new Date().toISOString();
+    const rows = [];
+    for (const def of TEMPLATE_DEFS) {
+      for (const lang of ["es", "eu"]) {
+        const el = document.getElementById(`tpl-${def.type}-${lang}`);
+        rows.push({ type: def.type, language: lang, text: (el ? el.value : "").trim(), updated_at: nowIso });
+      }
+    }
+    await sb("POST", "templates", { filter: "on_conflict=type,language", prefer: "resolution=merge-duplicates,return=minimal", body: rows });
+    templatesMap = {};
+    rows.forEach(r => { (templatesMap[r.type] ||= {})[r.language] = r.text; });
+    closeModal("modal-templates");
+    renderFeed();
+    showToast("Plantillas guardadas ✓");
+  } catch(e) { showToast("Error al guardar plantillas", true); }
+  finally { if (btn) { btn.disabled = false; btn.textContent = "Guardar plantillas"; } }
 }
 
 function sendDewormWA() {
