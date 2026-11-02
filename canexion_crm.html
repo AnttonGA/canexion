@@ -130,6 +130,8 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--tp);min-h
 .feed-btn{background:var(--gg);border:1px solid var(--bd);border-radius:12px;padding:5px 10px;font-family:'DM Sans',sans-serif;font-size:11px;font-weight:500;color:var(--tp);cursor:pointer;white-space:nowrap;text-decoration:none;display:inline-block;text-align:center;}
 .feed-btn.wa{background:#25d366;border-color:#25d366;color:white;}
 .feed-btn:hover{opacity:.8;}
+.feed-result{cursor:pointer;font-family:'DM Sans',sans-serif;max-width:120px;}
+.feed-cap{display:inline-block;background:#fde8e8;color:#c0392b;border:1px solid #f5c6c6;border-radius:12px;padding:5px 10px;font-size:11px;font-weight:600;white-space:nowrap;text-align:center;}
 .feed-empty{display:flex;flex-direction:column;align-items:center;justify-content:center;padding:60px 20px;text-align:center;}
 .feed-badge{display:inline-block;background:#e53e3e;color:white;border-radius:10px;font-size:10px;font-weight:700;padding:1px 6px;margin-left:4px;vertical-align:middle;line-height:1.4;}
 /* IDIOMA MODAL */
@@ -1234,6 +1236,8 @@ let discoveryCoupons = [];
 let dewormAlertsMap  = {}; // wk_client_id → alert
 let dewormKeywords   = []; // [{id, keyword}, …]
 let wkStatsMap       = {}; // wk_client_id → wk_client_stats row
+let msgLogByClient   = {}; // clients.id → [{aviso_type, result, created_at}] (últimos ~45 días)
+const MONTHLY_CAP    = 2;  // máx. mensajes/mes por socio (avisos + campañas + invitaciones)
 
 const PLAN_TEMPLATES = {
   cachorro: {
@@ -1484,15 +1488,19 @@ window.addEventListener("DOMContentLoaded", async () => {
 async function loadAll() {
   try {
     const todayISO = new Date().toISOString().split("T")[0];
-    const [cd, cpd, btd, dcd, dad, dkd, wksd] = await Promise.all([
+    const logSince = new Date(Date.now() - 45 * 86400000).toISOString();
+    const [cd, cpd, btd, dcd, dad, dkd, wksd, mld] = await Promise.all([
       sb("GET", "clients",           { order: "created_at.desc" }),
       sb("GET", "campaigns",         { order: "created_at.desc" }),
       sb("GET", "benefit_templates", { order: "order_index"     }),
       sb("GET", "discovery_coupons"),
       sb("GET", "deworm_alerts",   { filter: `status=eq.pending&reminder_date=lte.${todayISO}` }),
       sb("GET", "deworm_keywords", { order: "keyword" }),
-      sb("GET", "wk_client_stats")
+      sb("GET", "wk_client_stats"),
+      sb("GET", "message_log",     { filter: `created_at=gte.${logSince}` })
     ]);
+    msgLogByClient = {};
+    (mld || []).forEach(m => { (msgLogByClient[String(m.client_id)] ||= []).push(m); });
     // Deworm y Wakyma stats deben estar listos antes de mapClient
     dewormAlertsMap = {};
     (dad  || []).forEach(a => { dewormAlertsMap[String(a.wk_client_id)] = a; });
@@ -3720,8 +3728,28 @@ function buildFeedItems() {
     }
   }
 
-  items.sort((a, b) => a.priority - b.priority || a.clientName.localeCompare(b.clientName));
-  return items;
+  // Quitar avisos de socios dados de baja o ya gestionados en los últimos 14 días,
+  // y anotar cuántos mensajes lleva cada socio este mes (para el tope 2/mes).
+  const out = items
+    .filter(it => !isUnsubscribed(it.clientId) && !recentlyHandled(it.clientId, it.type))
+    .map(it => ({ ...it, monthCount: monthMsgCount(it.clientId) }));
+
+  out.sort((a, b) => a.priority - b.priority || a.clientName.localeCompare(b.clientName));
+  return out;
+}
+
+// ── Registro de mensajes / tope mensual ──────────────────
+function msgLogFor(clientId) { return msgLogByClient[String(clientId)] || []; }
+function monthMsgCount(clientId) {
+  const d = new Date(), y = d.getFullYear(), m = d.getMonth();
+  return msgLogFor(clientId).filter(x => { const t = new Date(x.created_at); return t.getFullYear() === y && t.getMonth() === m; }).length;
+}
+function recentlyHandled(clientId, type, days = 14) {
+  const cutoff = Date.now() - days * 86400000;
+  return msgLogFor(clientId).some(x => x.aviso_type === type && new Date(x.created_at).getTime() >= cutoff);
+}
+function isUnsubscribed(clientId) {
+  return msgLogFor(clientId).some(x => x.result === "baja");
 }
 
 function updateFeedBadge() {
@@ -3757,11 +3785,19 @@ function renderFeed() {
       const color = colors[item.type] || "#888";
       const msg   = encodeURIComponent(item.isEu ? item.msgEu : item.msgEs);
       const waUrl = `https://wa.me/${item.fp}?text=${msg}`;
-      const dismissBtn = item.type === "deworm"
-        ? `<button class="feed-btn" onclick="feedDismissDeworm('${item.alertId}','${item.wkClientId}',${i})">✓ Enviado</button>`
-        : item.type === "recovery"
-        ? `<button class="feed-btn" onclick="feedDismissRecovery('${item.clientId}',${i})">✓ Contactado</button>`
-        : "";
+      const capped = item.monthCount >= MONTHLY_CAP;
+      const waCell = capped
+        ? `<span class="feed-cap" title="Ya tiene ${item.monthCount} mensajes este mes">⛔ ${item.monthCount}/mes</span>
+           <a class="feed-btn" href="${waUrl}" target="_blank" style="font-size:10px;">Enviar igual</a>`
+        : `<a class="feed-btn wa" href="${waUrl}" target="_blank">📱 WA</a>`;
+      const resultSel = `<select class="feed-btn feed-result" onchange="logResult('${item.clientId}','${item.type}',this.value,${i})">
+          <option value="">Resultado…</option>
+          <option value="enviado">✓ Enviado</option>
+          <option value="ya_lo_tengo">Ya lo tiene</option>
+          <option value="preparamelo">Prepáramelo</option>
+          <option value="sin_respuesta">Sin respuesta</option>
+          <option value="baja">🚫 Baja</option>
+        </select>`;
       return `<div class="feed-card" id="feed-card-${i}" style="border-left-color:${color}">
         <div class="feed-icon">${item.icon}</div>
         <div class="feed-body">
@@ -3769,44 +3805,44 @@ function renderFeed() {
           <div class="feed-sub">${item.subtitle}</div>
         </div>
         <div class="feed-actions">
-          <a class="feed-btn wa" href="${waUrl}" target="_blank">📱 WA</a>
+          ${waCell}
+          ${resultSel}
           <button class="feed-btn" onclick="openProfile('${item.clientId}')">👤 Ver</button>
-          ${dismissBtn}
         </div>
       </div>`;
     }).join("");
 }
 
-async function feedDismissDeworm(alertId, wkClientId, cardIdx) {
+// Marca el resultado de un aviso de "Hoy": lo registra en message_log (cuenta para el
+// tope 2/mes y evita repetirlo 14 días), aplica la persistencia propia de cada tipo y
+// quita la tarjeta. "baja" además corta futuras comunicaciones comerciales del socio.
+async function logResult(clientId, type, result, cardIdx) {
+  if (!result) return;
   try {
-    await sb("PATCH", "deworm_alerts", { filter: `id=eq.${alertId}`, body: { status: "sent" } });
-    delete dewormAlertsMap[String(wkClientId)];
-    const idx = clients.findIndex(c => String(c.wk_client_id) === String(wkClientId));
-    if (idx >= 0) clients[idx].dewormAlert = null;
-    const card = document.getElementById(`feed-card-${cardIdx}`);
-    if (card) { card.classList.add("dismissed"); setTimeout(() => card.remove(), 200); }
-    setTimeout(() => {
-      const remaining = document.querySelectorAll(".feed-card").length;
-      if (!remaining) renderFeed();
-      updateFeedBadge();
-    }, 250);
-    showToast("Marcado como enviado ✓");
-  } catch(e) { showToast("Error al guardar", true); }
-}
+    await sb("POST", "message_log", { body: { client_id: String(clientId), aviso_type: type, result } });
+    (msgLogByClient[String(clientId)] ||= []).push({ aviso_type: type, result, created_at: new Date().toISOString() });
 
-async function feedDismissRecovery(clientId, cardIdx) {
-  try {
-    const nowIso = new Date().toISOString();
-    await sb("PATCH", "clients", { filter: `id=eq.${clientId}`, body: { retention_contacted_at: nowIso } });
-    const idx = clients.findIndex(c => c.id === String(clientId));
-    if (idx >= 0) clients[idx].retention_contacted_at = nowIso;
+    const c = clients.find(x => x.id === String(clientId));
+    if (type === "deworm" && c && c.dewormAlert) {
+      await sb("PATCH", "deworm_alerts", { filter: `id=eq.${c.dewormAlert.id}`, body: { status: "sent" } });
+      delete dewormAlertsMap[String(c.wk_client_id)];
+      c.dewormAlert = null;
+    } else if (type === "recovery") {
+      const nowIso = new Date().toISOString();
+      await sb("PATCH", "clients", { filter: `id=eq.${clientId}`, body: { retention_contacted_at: nowIso } });
+      if (c) c.retention_contacted_at = nowIso;
+    }
+    if (result === "baja") {
+      await sb("PATCH", "clients", { filter: `id=eq.${clientId}`, body: { marketing_consent: false } });
+      if (c) c.marketing_consent = false;
+    }
+
     const card = document.getElementById(`feed-card-${cardIdx}`);
     if (card) { card.classList.add("dismissed"); setTimeout(() => card.remove(), 200); }
-    setTimeout(() => {
-      if (!document.querySelectorAll(".feed-card").length) renderFeed();
-      updateFeedBadge();
-    }, 250);
-    showToast("Marcado como contactado ✓");
+    setTimeout(() => { if (!document.querySelectorAll(".feed-card").length) renderFeed(); updateFeedBadge(); }, 250);
+
+    const labels = { enviado: "Enviado", ya_lo_tengo: "Ya lo tiene", preparamelo: "Prepáramelo", sin_respuesta: "Sin respuesta", baja: "Baja" };
+    showToast((labels[result] || "Guardado") + " ✓");
   } catch(e) { showToast("Error al guardar", true); }
 }
 
