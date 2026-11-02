@@ -56,6 +56,20 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--tp);min-h
 .map-relocate-btn{flex-shrink:0;background:var(--gg);border:1px solid var(--bd);color:var(--gm);border-radius:var(--rs);padding:7px 12px;font-family:'DM Sans',sans-serif;font-size:12px;font-weight:500;cursor:pointer;transition:background .15s,border-color .15s;}
 .map-relocate-btn:hover{background:var(--gp);border-color:var(--gs);}
 .map-relocate-btn:disabled{opacity:.6;cursor:not-allowed;}
+.prod-bar{display:flex;gap:8px;align-items:center;padding:14px 20px 8px;flex-wrap:wrap;}
+.prod-search{flex:1;min-width:140px;background:var(--sf);border:1px solid var(--bd);border-radius:var(--rs);padding:10px 14px;font-family:'DM Sans',sans-serif;font-size:14px;color:var(--tp);outline:none;}
+.prod-filtersel{background:var(--sf);border:1px solid var(--bd);border-radius:var(--rs);padding:10px 12px;font-family:'DM Sans',sans-serif;font-size:13px;color:var(--tp);cursor:pointer;}
+.prod-import{background:var(--gm);color:#fff;border:none;border-radius:var(--rs);padding:10px 14px;font-family:'DM Sans',sans-serif;font-size:13px;font-weight:500;cursor:pointer;white-space:nowrap;}
+.prod-import:hover{background:var(--gd);}
+.prod-import:disabled{opacity:.6;cursor:not-allowed;}
+.prod-count{padding:0 20px 8px;font-size:12px;color:var(--tm);}
+.prod-head{display:grid;grid-template-columns:2.4fr 1.3fr 1fr .9fr .9fr .9fr;gap:8px;padding:6px 20px;font-size:11px;font-weight:500;color:var(--tm);text-transform:uppercase;letter-spacing:.04em;border-bottom:1px solid var(--bd);}
+.prod-list{padding:0 20px 24px;overflow-y:auto;}
+.prod-row{display:grid;grid-template-columns:2.4fr 1.3fr 1fr .9fr .9fr .9fr;gap:8px;align-items:center;padding:8px 0;border-bottom:1px solid var(--bd);}
+.prod-name{font-size:13px;color:var(--tp);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.prod-row select,.prod-row input{width:100%;background:var(--bg);border:1px solid var(--bd);border-radius:6px;padding:7px 8px;font-family:'DM Sans',sans-serif;font-size:12px;color:var(--tp);outline:none;}
+.prod-row select:focus,.prod-row input:focus{border-color:var(--gs);}
+.prod-empty{padding:24px;text-align:center;color:var(--tm);font-size:13px;}
 #map-container{flex:1;min-height:0;}
 
 /* SEARCH / LIST */
@@ -487,6 +501,7 @@ input:checked+.togslider:before{transform:translateX(16px);}
     <div class="nav-tab"        id="tab-today"    onclick="switchTab('today')">Hoy<span id="feed-badge" class="feed-badge" style="display:none;"></span></div>
     <div class="nav-tab"        id="tab-camps"    onclick="switchTab('camps')">Campañas</div>
     <div class="nav-tab"        id="tab-benefits" onclick="switchTab('benefits')">Beneficios</div>
+    <div class="nav-tab"        id="tab-products" onclick="switchTab('products')">🛒 Catálogo</div>
     <div class="nav-tab"        id="tab-map"      onclick="switchTab('map')">🗺 Mapa</div>
   </div>
 
@@ -769,6 +784,26 @@ input:checked+.togslider:before{transform:translateX(16px);}
     <div id="sy-list" class="feed-wrap">
       <div class="feed-empty"><div class="spinner"></div></div>
     </div>
+  </div>
+
+  <!-- SCREEN: CATÁLOGO DE PRODUCTOS -->
+  <div id="sprod" class="screen">
+    <div class="prod-bar">
+      <input class="prod-search" id="prod-search" type="text" placeholder="Buscar producto..." autocomplete="off" oninput="renderProductsList()"/>
+      <select class="prod-filtersel" id="prod-filter" onchange="renderProductsList()">
+        <option value="">Todos</option>
+        <option value="sin">Sin clasificar</option>
+        <option value="pienso">Pienso</option>
+        <option value="antiparasitario">Antiparasitario</option>
+        <option value="arena">Arena</option>
+      </select>
+      <button class="prod-import" onclick="importProductsFromWakyma(this)">⤓ Importar de Wakyma</button>
+    </div>
+    <div class="prod-count" id="prod-count"></div>
+    <div class="prod-head">
+      <span>Producto</span><span>Tipo</span><span>Especie</span><span>kg saco</span><span>días prot.</span><span>uds/env.</span>
+    </div>
+    <div id="prod-list" class="prod-list"><div class="prod-empty">Cargando…</div></div>
   </div>
 
   <!-- SCREEN: MAPA -->
@@ -1478,19 +1513,120 @@ async function loadAll() {
 
 // ── TABS ──────────────────────────────────────────────────
 function switchTab(tab) {
-  ["clients","today","camps","benefits","map"].forEach(t => {
+  ["clients","today","camps","benefits","products","map"].forEach(t => {
     document.getElementById("tab-" + t).classList.toggle("active", t === tab);
   });
   document.getElementById("ss").classList.toggle("active", tab === "clients");
   document.getElementById("sy").classList.toggle("active", tab === "today");
   document.getElementById("sc").classList.toggle("active", tab === "camps");
   document.getElementById("sb").classList.toggle("active", tab === "benefits");
+  document.getElementById("sprod").classList.toggle("active", tab === "products");
   document.getElementById("sm").classList.toggle("active", tab === "map");
   document.getElementById("fab").style.display = tab === "clients" ? "flex" : "none";
-  const titles = { clients: "Panel de fidelización", today: "Acciones de hoy", camps: "Campañas", benefits: "Beneficios", map: "Mapa de miembros" };
+  const titles = { clients: "Panel de fidelización", today: "Acciones de hoy", camps: "Campañas", benefits: "Beneficios", products: "Catálogo de productos", map: "Mapa de miembros" };
   document.getElementById("tb-title").textContent = titles[tab] || "";
-  if (tab === "map")   renderMap();
-  if (tab === "today") renderFeed();
+  if (tab === "map")      renderMap();
+  if (tab === "today")    renderFeed();
+  if (tab === "products") renderProductsTab();
+}
+
+// ── CATÁLOGO DE PRODUCTOS ─────────────────────────────────
+let products = null; // null = aún no cargado
+
+async function loadProducts() {
+  products = (await sb("GET", "products", { order: "name.asc" })) || [];
+}
+
+async function renderProductsTab() {
+  const cont = document.getElementById("prod-list");
+  if (products === null) {
+    cont.innerHTML = '<div class="prod-empty">Cargando…</div>';
+    try { await loadProducts(); }
+    catch(e) { cont.innerHTML = '<div class="prod-empty">Error al cargar el catálogo</div>'; return; }
+  }
+  renderProductsList();
+}
+
+function renderProductsList() {
+  if (products === null) return;
+  const q      = (document.getElementById("prod-search").value || "").trim().toLowerCase();
+  const filter = document.getElementById("prod-filter").value;
+  let list = products;
+  if (q)                list = list.filter(p => (p.name || "").toLowerCase().includes(q));
+  if (filter === "sin") list = list.filter(p => !p.type || p.type === "otro");
+  else if (filter)      list = list.filter(p => p.type === filter);
+  const clasif = products.filter(p => p.type && p.type !== "otro").length;
+  document.getElementById("prod-count").textContent =
+    products.length + " productos · " + clasif + " clasificados" +
+    (list.length !== products.length ? " · " + list.length + " mostrados" : "");
+  const cont = document.getElementById("prod-list");
+  if (!products.length) { cont.innerHTML = '<div class="prod-empty">Catálogo vacío. Pulsa "Importar de Wakyma".</div>'; return; }
+  if (!list.length)     { cont.innerHTML = '<div class="prod-empty">Sin resultados</div>'; return; }
+  cont.innerHTML = list.slice(0, 400).map(productRow).join("") +
+    (list.length > 400 ? '<div class="prod-empty">Mostrando 400 de ' + list.length + '. Afina con el buscador.</div>' : "");
+}
+
+function productRow(p) {
+  const sid = p.wk_service_id.replace(/'/g, "\\'");
+  const opt = (sel, v, label) => `<option value="${v}"${(sel || "") === v ? " selected" : ""}>${label}</option>`;
+  const typeSel =
+    opt(p.type, "otro", "— tipo —") + opt(p.type, "pienso", "Pienso") +
+    opt(p.type, "antiparasitario", "Antiparasit.") + opt(p.type, "arena", "Arena");
+  const spSel =
+    opt(p.species, "", "especie") + opt(p.species, "perro", "Perro") +
+    opt(p.species, "gato", "Gato") + opt(p.species, "ambos", "Ambos");
+  const n = v => (v === null || v === undefined) ? "" : v;
+  const nm = (p.name || "—").replace(/"/g, "&quot;");
+  return `<div class="prod-row">
+    <div class="prod-name" title="${nm}">${p.name || "—"}</div>
+    <select onchange="saveProductField('${sid}','type',this.value)">${typeSel}</select>
+    <select onchange="saveProductField('${sid}','species',this.value)">${spSel}</select>
+    <input type="number" step="0.1" placeholder="kg"   value="${n(p.sack_kg)}"         onchange="saveProductField('${sid}','sack_kg',this.value)"/>
+    <input type="number"            placeholder="días" value="${n(p.protection_days)}" onchange="saveProductField('${sid}','protection_days',this.value)"/>
+    <input type="number"            placeholder="uds"  value="${n(p.units_per_pack)}"  onchange="saveProductField('${sid}','units_per_pack',this.value)"/>
+  </div>`;
+}
+
+async function saveProductField(sid, field, value) {
+  const p = products.find(x => x.wk_service_id === sid);
+  if (!p) return;
+  let v = value;
+  if (field === "sack_kg")                                             v = value === "" ? null : parseFloat(value);
+  else if (field === "protection_days" || field === "units_per_pack") v = value === "" ? null : parseInt(value, 10);
+  p[field] = v;
+  if (field === "type") renderProductsList();   // refresca el contador de clasificados
+  try {
+    await sb("PATCH", "products", { filter: "wk_service_id=eq." + encodeURIComponent(sid), body: { [field]: v } });
+    showToast("Guardado ✓");
+  } catch(e) { showToast("Error al guardar", true); }
+}
+
+async function importProductsFromWakyma(btn) {
+  if (!confirm("¿Importar los productos de Wakyma al catálogo? Los que ya existan no se modifican.")) return;
+  const old = btn ? btn.textContent : "";
+  if (btn) { btn.disabled = true; btn.textContent = "Importando…"; }
+  try {
+    if (products === null) await loadProducts();
+    const existing = new Set(products.map(p => p.wk_service_id));
+    const res  = await wk("/api/v3/products?limit=2000");
+    const list = Array.isArray(res) ? res : (res && res.data ? res.data : []);
+    const nuevos = list
+      .filter(p => p && p.id && !existing.has(String(p.id)))
+      .map(p => ({ wk_service_id: String(p.id), name: p.name || "", type: "otro", species: "", active: true }));
+    if (!nuevos.length) {
+      showToast("Sin productos nuevos (" + list.length + " revisados)");
+    } else {
+      for (let i = 0; i < nuevos.length; i += 100) {
+        await sb("POST", "products", { body: nuevos.slice(i, i + 100), prefer: "return=representation,resolution=ignore-duplicates" });
+      }
+      showToast(nuevos.length + " productos importados ✓");
+    }
+    await loadProducts();
+    renderProductsList();
+  } catch(e) {
+    showToast("Error al importar: " + (e.message || e), true);
+  }
+  if (btn) { btn.disabled = false; btn.textContent = old; }
 }
 
 // ── LISTA DE CLIENTES ─────────────────────────────────────
