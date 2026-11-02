@@ -23,8 +23,10 @@ function addDays(dateStr, days) {
   return d.toISOString().slice(0, 10);
 }
 
-exports.handler = async () => {
+exports.handler = async (event) => {
   const cors = { "Access-Control-Allow-Origin": "*", "Content-Type": "application/json" };
+  let detail = false;
+  try { detail = !!JSON.parse((event && event.body) || "{}").detail; } catch(e) {}
   try {
     const today = new Date().toISOString().slice(0, 10);
 
@@ -58,7 +60,16 @@ exports.handler = async () => {
       // Cobertura = días que protege una unidad comprada × cuántas compró.
       const cover = (p.protection_days || 0) * (ln.quantity || 1);
       if (!cover) continue;
-      if (addDays(ln.sale_date, cover) <= today) due.push(ln);
+      const nextDue = addDays(ln.sale_date, cover);
+      if (nextDue <= today) { ln._days = p.protection_days; ln._nextDue = nextDue; ln._name = (socioMap[String(cid)] || {}).name; due.push(ln); }
+    }
+
+    // Modo detalle: lista los vencidos con el cálculo (no crea avisos)
+    if (detail) {
+      return { statusCode: 200, headers: cors, body: JSON.stringify({
+        ok: true, antiparasitarios: ids.length, socios_due: due.length, hoy: today,
+        detalle: due.slice(0, 30).map(d => ({ socio: d._name, producto: d.product_name, ultima_compra: d.sale_date, dias: d._days, cantidad: d.quantity, vence: d._nextDue }))
+      }) };
     }
 
     // 5) Evitar duplicados: socios que ya tienen un aviso pendiente
