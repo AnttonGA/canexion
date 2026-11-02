@@ -6,3 +6,6 @@
 
 [functions."wk-deworm-scan"]
   schedule = "0 8 * * *"
+
+[functions."wk-estados-scan"]
+  schedule = "30 8 * * *"
