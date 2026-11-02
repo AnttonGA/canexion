@@ -32,6 +32,15 @@ exports.handler = async (event) => {
 
   try {
     const b     = JSON.parse(event.body || "{}");
+    if (b.diag) {
+      const key = SUPABASE_KEY || "";
+      return { statusCode: 200, headers: cors, body: JSON.stringify({
+        url_set: !!SUPABASE_URL, url_prefix: (SUPABASE_URL || "").slice(0, 30),
+        service_set: !!process.env.SUPABASE_SERVICE_KEY,
+        publishable_set: !!process.env.SUPABASE_KEY,
+        used_key_prefix: key.slice(0, 11), used_key_len: key.length
+      }) };
+    }
     const start = b.start || 0;
     const from  = b.from  || "2026-01-01";
     const until = b.until || new Date().toISOString().split("T")[0];
