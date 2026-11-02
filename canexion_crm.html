@@ -778,22 +778,7 @@ input:checked+.togslider:before{transform:translateX(16px);}
         </div>
       </div>
 
-      <!-- Desparasitación -->
-      <div class="ben-section">
-        <div class="ben-sh">
-          <div>
-            <div class="ben-st">Desparasitación — palabras clave</div>
-            <div class="ben-ss">El escáner diario busca estas palabras en los productos vendidos en Wakyma (hace 75 días) para generar avisos de recordatorio.</div>
-          </div>
-        </div>
-        <div id="kw-list" class="kw-wrap">
-          <div class="loading-state"><div class="spinner"></div></div>
-        </div>
-        <div class="kw-add-row">
-          <input class="fi" id="kw-input" type="text" placeholder="Ej. frontline, pipeta…" style="flex:1;margin:0;" onkeydown="if(event.key==='Enter')addDewormKeyword()"/>
-          <button class="new-camp-btn" onclick="addDewormKeyword()">+ Añadir</button>
-        </div>
-      </div>
+      <!-- (La desparasitación ahora se calcula desde el catálogo de productos, no por palabras clave.) -->
 
     </div>
   </div>
@@ -1261,7 +1246,6 @@ let campaigns        = [];
 let benefitTemplates = [];
 let discoveryCoupons = [];
 let dewormAlertsMap  = {}; // wk_client_id → alert
-let dewormKeywords   = []; // [{id, keyword}, …]
 let wkStatsMap       = {}; // wk_client_id → wk_client_stats row
 let msgLogByClient   = {}; // clients.id → [{aviso_type, result, created_at}] (últimos ~45 días)
 let lastFeedItems    = []; // último render del feed (para acciones por índice, p.ej. push)
@@ -1560,13 +1544,12 @@ async function loadAll() {
   try {
     const todayISO = new Date().toISOString().split("T")[0];
     const logSince = new Date(Date.now() - 45 * 86400000).toISOString();
-    const [cd, cpd, btd, dcd, dad, dkd, wksd, mld, tpl] = await Promise.all([
+    const [cd, cpd, btd, dcd, dad, wksd, mld, tpl] = await Promise.all([
       sb("GET", "clients",           { order: "created_at.desc" }),
       sb("GET", "campaigns",         { order: "created_at.desc" }),
       sb("GET", "benefit_templates", { order: "order_index"     }),
       sb("GET", "discovery_coupons"),
       sb("GET", "deworm_alerts",   { filter: `status=eq.pending&reminder_date=lte.${todayISO}` }),
-      sb("GET", "deworm_keywords", { order: "keyword" }),
       sb("GET", "wk_client_stats"),
       sb("GET", "message_log",     { filter: `created_at=gte.${logSince}` }).catch(() => []),
       sb("GET", "templates").catch(() => [])
@@ -1580,7 +1563,6 @@ async function loadAll() {
     (dad  || []).forEach(a => { dewormAlertsMap[String(a.wk_client_id)] = a; });
     wkStatsMap = {};
     (wksd || []).forEach(s => { wkStatsMap[String(s.wk_client_id)] = s; });
-    dewormKeywords   = dkd || [];
     clients          = (cd  || []).map(mapClient);
     filtered         = [...clients];
     campaigns        = cpd || [];
@@ -1590,7 +1572,6 @@ async function loadAll() {
     renderCampaigns();
     renderBenefitTemplates();
     renderDiscoveryCoupons();
-    renderDewormKeywords();
     updateFeedBadge();
     document.getElementById("mc").textContent = clients.length + " miembro" + (clients.length !== 1 ? "s" : "");
     checkExpiringCoupons();
@@ -4015,43 +3996,6 @@ async function dismissDewormAlert() {
     applyFilters();
     showToast("Marcado como enviado ✓");
   } catch(e) { showToast("Error al guardar", true); }
-}
-
-function renderDewormKeywords() {
-  const el = document.getElementById("kw-list");
-  if (!el) return;
-  if (!dewormKeywords.length) {
-    el.innerHTML = '<span style="font-size:12px;color:var(--tm);">Sin palabras clave. Añade alguna abajo.</span>';
-    return;
-  }
-  el.innerHTML = dewormKeywords.map(kw =>
-    `<div class="kw-chip">
-      <span>${kw.keyword}</span>
-      <button onclick="deleteDewormKeyword('${kw.id}')" title="Eliminar">×</button>
-    </div>`
-  ).join("");
-}
-
-async function addDewormKeyword() {
-  const input = document.getElementById("kw-input");
-  const kw    = (input.value || "").trim().toLowerCase();
-  if (!kw) return;
-  if (dewormKeywords.some(k => k.keyword === kw)) { showToast("Ya existe esa palabra clave"); return; }
-  try {
-    const res = await sb("POST", "deworm_keywords", { body: { keyword: kw } });
-    dewormKeywords = [...dewormKeywords, ...(Array.isArray(res) ? res : (res ? [res] : [{ id: Date.now(), keyword: kw }]))];
-    dewormKeywords.sort((a,b) => a.keyword.localeCompare(b.keyword));
-    renderDewormKeywords();
-    input.value = "";
-  } catch(e) { showToast("Error al guardar", true); }
-}
-
-async function deleteDewormKeyword(id) {
-  try {
-    await sb("DELETE", "deworm_keywords", { filter: `id=eq.${id}` });
-    dewormKeywords = dewormKeywords.filter(k => String(k.id) !== String(id));
-    renderDewormKeywords();
-  } catch(e) { showToast("Error al eliminar", true); }
 }
 
 function sendReminder(i) {
