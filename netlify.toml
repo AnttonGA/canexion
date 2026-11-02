@@ -1,5 +1,8 @@
 [build]
   functions = "netlify/functions"
 
+[functions."sync-sales"]
+  schedule = "0 7 * * *"
+
 [functions."wk-deworm-scan"]
   schedule = "0 8 * * *"
