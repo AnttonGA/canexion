@@ -546,8 +546,10 @@ input:checked+.togslider:before{transform:translateX(16px);}
       <button class="chip" data-filter="anniversary" data-cls="on-purple" onclick="toggleChip('anniversary')">🎉 Aniversario</button>
       <button class="chip" data-filter="coupon"   data-cls="on-purple" onclick="toggleChip('coupon')">🎁 Cupón sin usar</button>
       <button class="chip" data-filter="deworm"   data-cls="on"        onclick="toggleChip('deworm')">💊 Desparasitar</button>
+      <button class="chip" data-filter="activo"   data-cls="on"        onclick="toggleChip('activo')">🟢 Activo</button>
       <button class="chip" data-filter="riesgo"   data-cls="on"        onclick="toggleChip('riesgo')">🟡 En riesgo</button>
       <button class="chip" data-filter="inactivo" data-cls="on"        onclick="toggleChip('inactivo')">🔴 Inactivo</button>
+      <button class="chip" data-filter="nowallet" data-cls="on"        onclick="toggleChip('nowallet')">📲 Sin tarjeta</button>
       <button class="chip" data-filter="new"      data-cls="on"        onclick="toggleChip('new')">✨ Nuevos</button>
       <button class="chip" data-filter="dog"      data-cls="on"        onclick="toggleChip('dog')">🐶 Perros</button>
       <button class="chip" data-filter="cat"      data-cls="on"        onclick="toggleChip('cat')">🐱 Gatos</button>
@@ -3415,10 +3417,6 @@ function isNewThisMonth(c) {
   return s.includes(ms[now.getMonth()]) && s.includes(String(now.getFullYear()));
 }
 
-function hasUnusedCoupon(c) {
-  return (c.benefits||[]).some(b => b.status === "active");
-}
-
 function nextBirthdayDays(c) {
   const pet = (c.pets||[]).find(p => p.pet_bday);
   if (!pet || !pet.pet_bday) return 9999;
@@ -3430,6 +3428,42 @@ function nextBirthdayDays(c) {
   return Math.floor((next - now) / 86400000);
 }
 
+// Cupón de verdad (campaña o descubrimiento), no un simple beneficio de bienvenida.
+function hasRealCoupon(c) {
+  return (c.benefits || []).some(b => b.status === "active" && (b.dot === "campaign" || String(b.id || "").startsWith("disc_")));
+}
+
+// Un predicado por chip. Los chips del MISMO grupo se combinan con O (OR);
+// grupos distintos se combinan con Y (AND). Los chips sueltos son su propio AND.
+const FILTER_PREDS = {
+  birthday:    c => c.birthdayWeek,
+  anniversary: c => c.anniversaryWeek,
+  deworm:      c => !!c.dewormAlert,
+  coupon:      c => hasRealCoupon(c),
+  expiry:      c => (c.benefits || []).some(b => {
+                 if (b.status !== "active" || !b.expiry) return false;
+                 const now = new Date(), in7 = new Date(now.getTime() + 7 * 86400000);
+                 const d = parseExpiry(b.expiry); return d && d >= now && d <= in7;
+               }),
+  new:         c => isNewThisMonth(c),
+  consent:     c => c.marketing_consent,
+  dog:      c => c.pets.some(p => p.species === "Perro"),
+  cat:      c => c.pets.some(p => p.species === "Gato"),
+  other:    c => c.pets.some(p => p.species !== "Perro" && p.species !== "Gato"),
+  activo:   c => c.retention_status === "activo",
+  riesgo:   c => c.retention_status === "riesgo",
+  inactivo: c => c.retention_status === "inactivo",
+  nowallet: c => !c.wallet_serial,
+  clinic:   c => c.svcArray.includes("clinica"),
+  shop:     c => c.svcArray.includes("tienda"),
+  grooming: c => c.svcArray.includes("peluqueria")
+};
+const FILTER_GROUPS = {
+  species:   ["dog", "cat", "other"],
+  retention: ["activo", "riesgo", "inactivo"],
+  service:   ["clinic", "shop", "grooming"]
+};
+
 function applyFilters() {
   const q = (document.getElementById("si")?.value || "").toLowerCase().trim();
   let list = [...clients];
@@ -3440,27 +3474,18 @@ function applyFilters() {
     c.pets.some(p => (p.name||"").toLowerCase().includes(q))
   );
 
-  if (activeFilters.has("birthday"))     list = list.filter(c => c.birthdayWeek);
-  if (activeFilters.has("anniversary"))  list = list.filter(c => c.anniversaryWeek);
-  if (activeFilters.has("deworm"))       list = list.filter(c => c.dewormAlert);
-  if (activeFilters.has("riesgo"))       list = list.filter(c => c.retention_status === "riesgo");
-  if (activeFilters.has("inactivo"))     list = list.filter(c => c.retention_status === "inactivo");
-  if (activeFilters.has("coupon"))   list = list.filter(c => hasUnusedCoupon(c));
-  if (activeFilters.has("expiry"))   list = list.filter(c => {
-    const now = new Date(), in7 = new Date(now.getTime() + 7 * 86400000);
-    return (c.benefits||[]).some(b => {
-      if (b.status !== "active" || !b.expiry) return false;
-      const d = parseExpiry(b.expiry); return d && d >= now && d <= in7;
-    });
-  });
-  if (activeFilters.has("new"))      list = list.filter(c => isNewThisMonth(c));
-  if (activeFilters.has("dog"))      list = list.filter(c => c.pets.some(p => p.species === "Perro"));
-  if (activeFilters.has("cat"))      list = list.filter(c => c.pets.some(p => p.species === "Gato"));
-  if (activeFilters.has("other"))    list = list.filter(c => c.pets.some(p => p.species !== "Perro" && p.species !== "Gato"));
-  if (activeFilters.has("clinic"))   list = list.filter(c => c.svcArray.includes("clinica"));
-  if (activeFilters.has("shop"))     list = list.filter(c => c.svcArray.includes("tienda"));
-  if (activeFilters.has("grooming")) list = list.filter(c => c.svcArray.includes("peluqueria"));
-  if (activeFilters.has("consent"))  list = list.filter(c => c.marketing_consent);
+  // Grupos: dentro de cada grupo basta con cumplir UNO (OR); entre grupos, TODOS (AND).
+  const grouped = new Set();
+  for (const keys of Object.values(FILTER_GROUPS)) {
+    keys.forEach(k => grouped.add(k));
+    const activeInGroup = keys.filter(k => activeFilters.has(k));
+    if (activeInGroup.length) list = list.filter(c => activeInGroup.some(k => FILTER_PREDS[k](c)));
+  }
+  // Chips sueltos (no de grupo): cada uno su condición, combinados con AND.
+  for (const k of activeFilters) {
+    if (grouped.has(k) || !FILTER_PREDS[k]) continue;
+    list = list.filter(FILTER_PREDS[k]);
+  }
 
   if (sortMode === "name")     list.sort((a,b) => a.name.localeCompare(b.name));
   if (sortMode === "birthday") list.sort((a,b) => nextBirthdayDays(a) - nextBirthdayDays(b));
