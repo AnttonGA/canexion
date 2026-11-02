@@ -41,6 +41,13 @@ exports.handler = async (event) => {
         used_key_prefix: key.slice(0, 11), used_key_len: key.length
       }) };
     }
+    if (b.count) {
+      const r = await fetch(`${SUPABASE_URL}/rest/v1/sales_lines?select=line_id`, {
+        headers: { "apikey": SUPABASE_KEY, "Authorization": "Bearer " + SUPABASE_KEY, "Prefer": "count=exact", "Range": "0-0" }
+      });
+      const cr = r.headers.get("content-range") || "";
+      return { statusCode: 200, headers: cors, body: JSON.stringify({ count: cr.split("/")[1] || "?" }) };
+    }
     const start = b.start || 0;
     const from  = b.from  || "2026-01-01";
     const until = b.until || new Date().toISOString().split("T")[0];
