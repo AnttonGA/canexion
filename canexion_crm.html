@@ -1186,49 +1186,6 @@ async function linkOrCreateInWakyma(phone, name, email, postalCode, address, mar
   }
 }
 
-const wkCache = {}; // phone normalizado → stats | null
-
-async function fetchWkStats(phone) {
-  const p = (phone || "").replace(/\D/g,"");
-  if (!p) return null;
-  if (p in wkCache) return wkCache[p];
-  try {
-    const cRes  = await wk("/api/v3/clients?phone=" + encodeURIComponent(p));
-    const cList = Array.isArray(cRes) ? cRes : (cRes.data || []);
-    if (!cList.length) { wkCache[p] = null; return null; }
-    const wkId = cList[0].id;
-    const year = new Date().getFullYear();
-    const pad  = n => String(n).padStart(2,"0");
-    const d    = new Date();
-    const todayDMY = `${pad(d.getDate())}-${pad(d.getMonth()+1)}-${d.getFullYear()}`;
-    const todayISO = d.toISOString().split("T")[0];
-    const yr1ago   = new Date(d); yr1ago.setFullYear(yr1ago.getFullYear() - 1);
-    const yr1agoISO = yr1ago.toISOString().split("T")[0];
-
-    const [apptAllRes, apptYearRes, salesRes] = await Promise.all([
-      wk(`/api/v3/appointments?clientId=${wkId}`),
-      wk(`/api/v3/appointments?clientId=${wkId}&dateFrom=01-01-${year}&dateUntil=${todayDMY}`),
-      wk(`/api/v3/sales?clientId=${wkId}&dateFrom=${yr1agoISO}&dateUntil=${todayISO}`)
-    ]);
-
-    const apptAll  = Array.isArray(apptAllRes)  ? apptAllRes  : (apptAllRes.data  || []);
-    const apptYear = Array.isArray(apptYearRes) ? apptYearRes : (apptYearRes.data || []);
-    const sales    = Array.isArray(salesRes)    ? salesRes    : (salesRes.data    || []);
-
-    const lastDone = apptAll.filter(a => a.state === 4)
-      .sort((a,b) => new Date(b.date||b.startDate) - new Date(a.date||a.startDate))[0];
-    const lastVisitDaysAgo = lastDone
-      ? (Date.now() - new Date(lastDone.date||lastDone.startDate).getTime()) / 86400000
-      : null;
-
-    const visitsThisYear = apptYear.filter(a => a.state === 4).length;
-    const spentThisYear  = sales.reduce((s, x) => s + parseFloat(x.total || x.amount || 0), 0);
-    const hasActivity    = sales.length > 0; // compra en los últimos 12 meses
-
-    wkCache[p] = { wkId, lastVisitDaysAgo, visitsThisYear, spentThisYear, hasActivity };
-    return wkCache[p];
-  } catch(e) { wkCache[p] = null; return null; }
-}
 
 function fmtWkDate(d) {
   if (!d) return "—";
@@ -2800,6 +2757,10 @@ function goToCampStep2() {
 }
 
 const condFields = [
+  { value:"retention",     label:"Estado de socio es",            opts:[{v:"activo",l:"🟢 Activo"},{v:"riesgo",l:"🟡 En riesgo"},{v:"inactivo",l:"🔴 Inactivo"},{v:"sin_datos",l:"⚪ Sin datos"}] },
+  { value:"hasWallet",     label:"Tarjeta wallet",                opts:[{v:"si",l:"Sí la tiene instalada"},{v:"no",l:"No la tiene"}] },
+  { value:"noActivityDays",label:"Sin actividad (cualquiera) en más de X días", num:true, min:1, ph:"ej. 120" },
+  { value:"buyIntervalGt", label:"Intervalo de compra habitual > X días",       num:true, min:1, ph:"ej. 60"  },
   { value:"species",       label:"Especie es",                    opts:[{v:"Perro",l:"Perro"},{v:"Gato",l:"Gato"},{v:"Otro",l:"Otro"}] },
   { value:"svc",           label:"Servicio que usa",              opts:[{v:"clinica",l:"Clínica"},{v:"tienda",l:"Tienda"},{v:"peluqueria",l:"Peluquería"}] },
   { value:"petAgeGt",      label:"Edad mascota mayor que (años)", num:true, min:0, max:25, ph:"ej. 3" },
@@ -2883,6 +2844,11 @@ function matchesConditions(client, conditions) {
       case "sinceMonthsGt":  return getSinceMonths(client.since) > parseInt(cond.value);
       case "sinceMonthsLt":  return getSinceMonths(client.since) < parseInt(cond.value);
       case "postal_code":    return (client.postal_code || "") === cond.value;
+      // Estado de socio / wallet (calculados a diario, en el propio cliente)
+      case "retention":      return (client.retention_status || "") === cond.value;
+      case "hasWallet":      return cond.value === "si" ? !!client.wallet_serial : !client.wallet_serial;
+      case "noActivityDays": { const d = daysSince(client.last_activity); return d !== null && d > v; }
+      case "buyIntervalGt":  return client.buy_interval_days != null && client.buy_interval_days > v;
       // Wakyma stats (desde caché local — instantáneo)
       case "wkShopGt":       return s && (s.tienda_total || 0) > v;
       case "wkVetGt":        return s && (s.vet_total    || 0) > v;
@@ -3215,27 +3181,46 @@ async function saveDisc() {
 
 // ── MOTOR DE RECOMENDACIONES ─────────────────────────────
 
-function analyzePatterns(members, wkMap) {
-  // wkMap: phone → stats | null  (solo clientes activos en los últimos 12 meses)
-  const active = members.filter(m => {
-    const s = wkMap[(m.phone||"").replace(/\D/g,"")];
-    return s && s.hasActivity;
-  });
+function analyzePatterns(members) {
+  // Usa el estado y las stats ya calculados a diario (retention_status + wkStats).
+  // "Con datos" excluye cuentas de prueba / sin ventas (sin_datos).
+  const withData  = members.filter(m => m.retention_status && m.retention_status !== "sin_datos");
+  const active    = withData;                  // alias para las pautas de abajo
+  const consented = m => m.marketing_consent;  // RGPD: las campañas solo van a quien consiente
   const recs = [];
-  const min = Math.max(1, Math.round(active.length * 0.10)); // mínimo 10% de activos
+  const min  = Math.max(1, Math.round(withData.length * 0.10)); // mínimo 10%
 
-  // 1 — Sin visita en >60 días
-  const noVisit = active.filter(m => {
-    const s = wkMap[m.phone.replace(/\D/g,"")];
-    return s && s.lastVisitDaysAgo !== null && s.lastVisitDaysAgo > 60;
+  // 1 — Inactivos → recuperación (umbral bajo: aunque sean pocos, interesa)
+  const inactivos = withData.filter(m => m.retention_status === "inactivo" && consented(m));
+  if (inactivos.length >= 1) recs.push({
+    icon:"🔴", impact: inactivos.length,
+    title: "Socios inactivos para recuperar",
+    desc:  `${inactivos.length} socio${inactivos.length>1?"s":""} sin actividad desde hace mucho. Una campaña de recuperación puede traerlos de vuelta.`,
+    suggestion: '"¡Te echamos de menos! 20% en tu próxima visita o compra"',
+    conditions: [{ field:"retention", value:"inactivo" }],
+    campName:"Recuperación — Te echamos de menos", campDesc:"20% en tu próxima visita o compra", campDisc:"20% de descuento"
   });
-  if (noVisit.length >= min) recs.push({
-    icon:"📅", impact: noVisit.length,
-    title: "Clientes sin visita reciente",
-    desc:  `${noVisit.length} miembro${noVisit.length>1?"s":""} activo${noVisit.length>1?"s":""} lleva${noVisit.length>1?"n":""} más de 60 días sin visitar la clínica.`,
-    suggestion: '"¡Te echamos de menos! 15% de descuento en tu próxima visita"',
-    conditions: [{ field:"wkNoVisitDays", value:"60" }],
-    campName:"Reactivación — Vuelve a vernos", campDesc:"15% en tu próxima visita", campDisc:"15% de descuento"
+
+  // 2 — En riesgo → reactivación suave
+  const enRiesgo = withData.filter(m => m.retention_status === "riesgo" && consented(m));
+  if (enRiesgo.length >= min) recs.push({
+    icon:"🟡", impact: enRiesgo.length,
+    title: "Socios en riesgo",
+    desc:  `${enRiesgo.length} socio${enRiesgo.length>1?"s":""} lleva${enRiesgo.length>1?"n":""} más de 90 días sin pasar. Un pequeño incentivo ahora evita que se enfríen.`,
+    suggestion: '"Vuelve a vernos — 10% en tu próxima visita"',
+    conditions: [{ field:"retention", value:"riesgo" }],
+    campName:"Reactivación — Vuelve a vernos", campDesc:"10% en tu próxima visita", campDisc:"10% de descuento"
+  });
+
+  // 3 — Socios sin tarjeta digital → invitación a instalarla (prepara el canal push)
+  const sinWallet = withData.filter(m => !m.wallet_serial && consented(m));
+  if (sinWallet.length >= min) recs.push({
+    icon:"📲", impact: sinWallet.length,
+    title: "Socios sin la tarjeta digital",
+    desc:  `${sinWallet.length} socio${sinWallet.length>1?"s":""} aún no tiene${sinWallet.length>1?"n":""} la tarjeta en el móvil. Instalarla habilita avisos directos sin coste.`,
+    suggestion: '"Guarda tu tarjeta de socio en el móvil y no te pierdas ningún aviso 🐾"',
+    conditions: [{ field:"hasWallet", value:"no" }],
+    campName:"Instala tu tarjeta digital", campDesc:"Tu tarjeta de socio, siempre en el móvil", campDisc:"Sin coste"
   });
 
   // 2 — Solo clínica, sin tienda
@@ -3273,13 +3258,14 @@ function analyzePatterns(members, wkMap) {
 
   // 5 — Alto gasto (>200€ en 12 meses) sin reconocimiento VIP
   const highSpend = active.filter(m => {
-    const s = wkMap[m.phone.replace(/\D/g,"")];
-    return s && s.spentThisYear > 200 && !(m.benefits||[]).some(b=>b.dot==="campaign"&&b.status==="active");
+    const s = m.wkStats;
+    const total = s ? ((s.tienda_total||0)+(s.vet_total||0)+(s.peluqueria_total||0)) : 0;
+    return total > 200 && !(m.benefits||[]).some(b=>b.dot==="campaign"&&b.status==="active");
   });
   if (highSpend.length >= min) recs.push({
     icon:"⭐", impact: highSpend.length,
     title: "Clientes de alto valor sin reconocimiento",
-    desc:  `${highSpend.length} miembro${highSpend.length>1?"s":""} ha${highSpend.length>1?"n":""} gastado más de 200€ en el último año y no tiene${highSpend.length>1?"n":""} ningún cupón de campaña activo.`,
+    desc:  `${highSpend.length} miembro${highSpend.length>1?"s":""} ha${highSpend.length>1?"n":""} gastado más de 200€ en total y no tiene${highSpend.length>1?"n":""} ningún cupón de campaña activo.`,
     suggestion: '"Gracias por tu confianza — acceso exclusivo a beneficios VIP"',
     conditions: [{ field:"wkSpentGt", value:"200" }],
     campName:"Clientes VIP — Gracias", campDesc:"Beneficio exclusivo por tu fidelidad", campDisc:"Descuento VIP especial"
@@ -3348,30 +3334,9 @@ async function openRecsPanel() {
   btn.textContent = "⏳ Analizando...";
   btn.disabled = true;
 
-  // Progreso
-  const total = clients.length;
-  panel.innerHTML = `
-    <div class="recs-progress" id="recs-prog">
-      <span id="recs-prog-txt">Consultando Wakyma: 0 / ${total} miembros…</span>
-      <div class="recs-progress-bar"><div class="recs-progress-fill" id="recs-prog-fill" style="width:0%"></div></div>
-    </div>`;
-
-  // Fetch stats para todos los clientes en serie (respeta rate limit automáticamente)
-  const wkMap = {};
-  for (let i = 0; i < clients.length; i++) {
-    const c = clients[i];
-    const stats = await fetchWkStats(c.phone);
-    wkMap[(c.phone||"").replace(/\D/g,"")] = stats;
-    // Actualizar progreso
-    const pct = Math.round(((i+1)/total)*100);
-    const progEl = document.getElementById("recs-prog-txt");
-    const fillEl = document.getElementById("recs-prog-fill");
-    if (progEl) progEl.textContent = `Consultando Wakyma: ${i+1} / ${total} miembros…`;
-    if (fillEl) fillEl.style.width = pct + "%";
-  }
-
-  // Analizar y renderizar
-  const recs = analyzePatterns(clients, wkMap);
+  // Los estados y stats se calculan a diario (sync-stats → wk_client_stats + retention_status),
+  // así que el análisis es instantáneo sobre los datos ya cargados (sin consultar Wakyma).
+  const recs = analyzePatterns(clients);
   renderRecs(recs);
   btn.textContent = "💡 Sugerencias";
   btn.disabled = false;
