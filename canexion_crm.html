@@ -3667,6 +3667,7 @@ async function sendWelcomeCard(btn) {
     });
     const data = await r.json();
     if (!r.ok || !data.shareUrl) throw new Error(data.error || "No se pudo crear la tarjeta");
+    if (data.serialNumber) c.wallet_serial = data.serialNumber;   // guardado también en BD por crear-pase.js
     const petES = petName || "tu mascota";
     const petEU = petName || "zure maskota";
     const msg = isEu

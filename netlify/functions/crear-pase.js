@@ -7,6 +7,21 @@
 //   WALLETWALLET_KEY → la API key de WalletWallet (empieza por ww_live_...)
 
 const WALLETWALLET_KEY = process.env.WALLETWALLET_KEY;
+const SUPABASE_URL     = process.env.SUPABASE_URL;
+const SUPABASE_KEY     = process.env.SUPABASE_SERVICE_KEY || process.env.SUPABASE_KEY;
+
+// Guarda el serial de la tarjeta en clients.wallet_serial (para poder actualizar el
+// pase y lanzar push más adelante). No rompe la creación si Supabase falla.
+async function saveSerial(clientId, serial) {
+  if (!SUPABASE_URL || !SUPABASE_KEY || !serial) return;
+  try {
+    await fetch(`${SUPABASE_URL}/rest/v1/clients?id=eq.${encodeURIComponent(clientId)}`, {
+      method: "PATCH",
+      headers: { "apikey": SUPABASE_KEY, "Authorization": "Bearer " + SUPABASE_KEY, "Content-Type": "application/json", "Prefer": "return=minimal" },
+      body: JSON.stringify({ wallet_serial: String(serial) })
+    });
+  } catch (e) { /* no bloquear la creación de la tarjeta */ }
+}
 
 exports.handler = async (event) => {
   const cors = {
@@ -54,6 +69,7 @@ exports.handler = async (event) => {
     }
 
     const data = JSON.parse(text);
+    await saveSerial(clientId, data.serialNumber);   // guardar el serial para push
     return {
       statusCode: 200,
       headers: cors,
