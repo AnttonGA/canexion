@@ -13,14 +13,20 @@ const SUPABASE_URL = process.env.SUPABASE_URL;
 // service_role (ignora RLS) si está; si no, la publishable (fallback).
 const SUPABASE_KEY = process.env.SUPABASE_SERVICE_KEY || process.env.SUPABASE_KEY;
 
+const sleep = ms => new Promise(r => setTimeout(r, ms));
+
+// Throttle a ~1,1s/llamada (≈54/min) + reintento ante 429 (Wakyma limita a 60/min).
 async function wk(endpoint) {
-  const r = await fetch("https://vets.wakyma.com" + endpoint, {
-    headers: { "Authorization": "Bearer " + WAKYMA_KEY }
-  });
-  const text = await r.text();
-  if (!r.ok) throw new Error(`Wakyma ${r.status}: ${text.slice(0, 150)}`);
-  const json = JSON.parse(text);
-  return json.data ?? json;
+  for (let attempt = 0; attempt < 4; attempt++) {
+    await sleep(1100);
+    const r = await fetch("https://vets.wakyma.com" + endpoint, { headers: { "Authorization": "Bearer " + WAKYMA_KEY } });
+    if (r.status === 429) { await sleep(20000); continue; }
+    const text = await r.text();
+    if (!r.ok) throw new Error(`Wakyma ${r.status}: ${text.slice(0, 150)}`);
+    const json = JSON.parse(text);
+    return json.data ?? json;
+  }
+  throw new Error("Wakyma 429 persistente");
 }
 
 async function sb(method, path, body) {
