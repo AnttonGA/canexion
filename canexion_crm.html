@@ -105,6 +105,10 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--tp);min-h
 .dismiss-btn{background:none;border:1px solid #a5d6a7;border-radius:20px;padding:6px 12px;font-family:'DM Sans',sans-serif;font-size:11px;font-weight:500;color:#2e7d32;cursor:pointer;white-space:nowrap;}
 .dismiss-btn:hover{background:#e8f5e9;}
 .badge.deworm{background:#e8f5e9;color:#2e7d32;}
+.badge.ret-activo{background:#e8f5e9;color:#2e7d32;}
+.badge.ret-riesgo{background:#fdf0e3;color:#b45309;}
+.badge.ret-inactivo{background:#fde8e8;color:#c0392b;}
+.badge.ret-sin_datos{background:var(--gg);color:var(--tm);}
 .kw-wrap{display:flex;flex-wrap:wrap;gap:6px;margin-top:4px;min-height:28px;}
 .kw-chip{display:inline-flex;align-items:center;gap:5px;background:var(--gg);border:1px solid var(--bd);border-radius:12px;padding:3px 8px 3px 10px;font-size:12px;color:var(--tp);}
 .kw-chip button{background:none;border:none;font-size:14px;line-height:1;cursor:pointer;color:var(--tm);padding:0;}
@@ -529,6 +533,8 @@ input:checked+.togslider:before{transform:translateX(16px);}
       <button class="chip" data-filter="anniversary" data-cls="on-purple" onclick="toggleChip('anniversary')">🎉 Aniversario</button>
       <button class="chip" data-filter="coupon"   data-cls="on-purple" onclick="toggleChip('coupon')">🎁 Cupón sin usar</button>
       <button class="chip" data-filter="deworm"   data-cls="on"        onclick="toggleChip('deworm')">💊 Desparasitar</button>
+      <button class="chip" data-filter="riesgo"   data-cls="on"        onclick="toggleChip('riesgo')">🟡 En riesgo</button>
+      <button class="chip" data-filter="inactivo" data-cls="on"        onclick="toggleChip('inactivo')">🔴 Inactivo</button>
       <button class="chip" data-filter="new"      data-cls="on"        onclick="toggleChip('new')">✨ Nuevos</button>
       <button class="chip" data-filter="dog"      data-cls="on"        onclick="toggleChip('dog')">🐶 Perros</button>
       <button class="chip" data-filter="cat"      data-cls="on"        onclick="toggleChip('cat')">🐱 Gatos</button>
@@ -1642,6 +1648,10 @@ async function importProductsFromWakyma(btn) {
   if (btn) { btn.disabled = false; btn.textContent = old; }
 }
 
+// Badge de estado de retención (activo|riesgo|inactivo|sin_datos)
+const RET_LABEL = { activo:["🟢","Activo"], riesgo:["🟡","En riesgo"], inactivo:["🔴","Inactivo"], sin_datos:["⚪","Sin datos"] };
+function retentionBadge(status) { const m = RET_LABEL[status]; return m ? `<span class="badge ret-${status}">${m[0]} ${m[1]}</span>` : ""; }
+
 // ── LISTA DE CLIENTES ─────────────────────────────────────
 function renderList(list) {
   document.getElementById("mc").textContent = clients.length + " miembro" + (clients.length !== 1 ? "s" : "");
@@ -1667,6 +1677,7 @@ function renderList(list) {
           ${c.birthdayWeek    ? '<span class="badge birthday">🎂 Cumpleaños</span>'  : ""}
           ${c.anniversaryWeek ? '<span class="badge eu">🎉 Aniversario</span>'     : ""}
           ${c.dewormAlert     ? '<span class="badge deworm">💊 Desparasitar</span>' : ""}
+          ${(c.retention_status === "riesgo" || c.retention_status === "inactivo") ? retentionBadge(c.retention_status) : ""}
           ${c.wk_client_id    ? '<span class="badge wk">⚡ Wakyma</span>'          : ""}
           ${c.language === "eu" ? '<span class="badge eu">EUS</span>'            : ""}
         </div>
@@ -1733,7 +1744,9 @@ function openProfile(id) {
     "Miembro desde " + c.since +
     (c.wk_client_id
       ? ' &nbsp;<span style="background:rgba(200,230,203,.15);border:1px solid rgba(200,230,203,.25);padding:2px 8px;border-radius:20px;font-size:10px;color:rgba(200,230,203,.75);">⚡ Wakyma vinculado</span>'
-      : ' &nbsp;<span style="opacity:.45;">· Sin vincular a Wakyma</span>');
+      : ' &nbsp;<span style="opacity:.45;">· Sin vincular a Wakyma</span>') +
+    (c.retention_status ? " &nbsp;" + retentionBadge(c.retention_status)
+      + (c.last_activity ? ` <span style="opacity:.5;font-size:10px;">· última actividad ${c.last_activity}</span>` : "") : "");
 
   // Botón "Cobrar en Wakyma" solo si el cliente está vinculado
   const cobrarBtn = document.getElementById("pcobrar");
@@ -3402,6 +3415,8 @@ function applyFilters() {
   if (activeFilters.has("birthday"))     list = list.filter(c => c.birthdayWeek);
   if (activeFilters.has("anniversary"))  list = list.filter(c => c.anniversaryWeek);
   if (activeFilters.has("deworm"))       list = list.filter(c => c.dewormAlert);
+  if (activeFilters.has("riesgo"))       list = list.filter(c => c.retention_status === "riesgo");
+  if (activeFilters.has("inactivo"))     list = list.filter(c => c.retention_status === "inactivo");
   if (activeFilters.has("coupon"))   list = list.filter(c => hasUnusedCoupon(c));
   if (activeFilters.has("expiry"))   list = list.filter(c => {
     const now = new Date(), in7 = new Date(now.getTime() + 7 * 86400000);
@@ -3626,6 +3641,22 @@ function buildFeedItems() {
       });
     }
 
+    // 1b — Recuperación de socio inactivo (silenciado 30 días tras contactar)
+    if (c.retention_status === "inactivo") {
+      const contactedDays = c.retention_contacted_at ? (now - new Date(c.retention_contacted_at)) / 86400000 : 9999;
+      if (contactedDays > 30) {
+        items.push({
+          priority: 15, type: "recovery", icon: "💜",
+          title: "Recuperar socio inactivo",
+          subtitle: `${c.name}${c.last_activity ? ` · última actividad ${c.last_activity}` : ""}`,
+          clientId: c.id, clientName: c.name, fp,
+          msgEs: `¡Hola ${firstName}! 👋 Hace tiempo que no os vemos por Canexion y os echamos de menos 🐾 ¿Va todo bien con tu peludo? Si necesitáis cualquier cosa —pienso, una revisión, desparasitación...— aquí estamos. ¡Un abrazo!`,
+          msgEu: `Kaixo ${firstName}! 👋 Aspaldian ez zaituztegu Canexionen ikusi eta faltan botatzen zaituztegu 🐾 Dena ondo zure lagunarekin? Ezer behar baduzue —pentsua, errebisioa, desparasitazioa...— hemen gaude. Besarkada bat!`,
+          isEu
+        });
+      }
+    }
+
     // 2 — Cupones urgentes (≤3 días)
     for (const b of (c.benefits || [])) {
       if (b.status !== "active" || !b.expiry) continue;
@@ -3717,7 +3748,7 @@ function renderFeed() {
     return;
   }
 
-  const colors = { deworm:"#4caf50", expiry:"#e67e22", anniversary:"#9c27b0", birthday:"#f59e0b", new:"#2196f3" };
+  const colors = { deworm:"#4caf50", recovery:"#8e44ad", expiry:"#e67e22", anniversary:"#9c27b0", birthday:"#f59e0b", new:"#2196f3" };
 
   const today = new Date().toLocaleDateString("es-ES", { weekday:"long", day:"numeric", month:"long" });
 
@@ -3728,6 +3759,8 @@ function renderFeed() {
       const waUrl = `https://wa.me/${item.fp}?text=${msg}`;
       const dismissBtn = item.type === "deworm"
         ? `<button class="feed-btn" onclick="feedDismissDeworm('${item.alertId}','${item.wkClientId}',${i})">✓ Enviado</button>`
+        : item.type === "recovery"
+        ? `<button class="feed-btn" onclick="feedDismissRecovery('${item.clientId}',${i})">✓ Contactado</button>`
         : "";
       return `<div class="feed-card" id="feed-card-${i}" style="border-left-color:${color}">
         <div class="feed-icon">${item.icon}</div>
@@ -3758,6 +3791,22 @@ async function feedDismissDeworm(alertId, wkClientId, cardIdx) {
       updateFeedBadge();
     }, 250);
     showToast("Marcado como enviado ✓");
+  } catch(e) { showToast("Error al guardar", true); }
+}
+
+async function feedDismissRecovery(clientId, cardIdx) {
+  try {
+    const nowIso = new Date().toISOString();
+    await sb("PATCH", "clients", { filter: `id=eq.${clientId}`, body: { retention_contacted_at: nowIso } });
+    const idx = clients.findIndex(c => c.id === String(clientId));
+    if (idx >= 0) clients[idx].retention_contacted_at = nowIso;
+    const card = document.getElementById(`feed-card-${cardIdx}`);
+    if (card) { card.classList.add("dismissed"); setTimeout(() => card.remove(), 200); }
+    setTimeout(() => {
+      if (!document.querySelectorAll(".feed-card").length) renderFeed();
+      updateFeedBadge();
+    }, 250);
+    showToast("Marcado como contactado ✓");
   } catch(e) { showToast("Error al guardar", true); }
 }
 
