@@ -21,7 +21,10 @@ const EMP_ROLE = {
 // Umbrales (reglas del spec). Fáciles de tocar.
 const ACTIVE_DAYS   = 90;    // activo si hay compra/visita en los últimos 90 días
 const VET_INACTIVE  = 456;   // 15 meses sin visita al vet → inactivo
-const STORE_FALLBACK_INACTIVE = 180; // sin intervalo conocido, inactivo a 180 días
+const STORE_FALLBACK_INACTIVE = 180; // sin intervalo fiable, inactivo a 180 días
+const FLOOR_INACTIVE = 180;  // suelo: nunca inactivo antes de 180 días sin NINGUNA actividad
+const COLLAPSE_DAYS  = 7;    // compras a ≤7 días se cuentan como un solo evento (tickets del mismo viaje)
+const MIN_EVENTS     = 3;    // nº mínimo de eventos de compra para fiarse del intervalo
 
 const DAY = 86400000;
 const sleep = ms => new Promise(r => setTimeout(r, ms));
@@ -52,33 +55,41 @@ async function sb(method, path, body, extraPrefer) {
 const fmtD = d => d ? (d.toString().split("T")[0]) : null;
 const daysSince = (dateStr, today) => dateStr ? Math.floor((today - new Date(dateStr + "T00:00:00Z").getTime()) / DAY) : null;
 
-// Mediana de los huecos (en días) entre compras de tienda ordenadas.
-function medianInterval(dates) {
+// Intervalo de compra en tienda: colapsa compras de la misma semana en un solo evento
+// (tickets del mismo viaje / devoluciones) y devuelve la mediana de huecos + nº de eventos.
+function purchaseInterval(dates) {
   const ds = [...new Set(dates)].filter(Boolean).sort();  // una por día, ascendente
-  if (ds.length < 2) return null;
-  const gaps = [];
-  for (let i = 1; i < ds.length; i++) {
-    gaps.push(Math.round((new Date(ds[i]) - new Date(ds[i - 1])) / DAY));
+  const events = [];
+  for (const d of ds) {
+    if (!events.length || (new Date(d) - new Date(events[events.length - 1])) / DAY > COLLAPSE_DAYS) events.push(d);
   }
+  if (events.length < 2) return { interval: null, events: events.length };
+  const gaps = [];
+  for (let i = 1; i < events.length; i++) gaps.push(Math.round((new Date(events[i]) - new Date(events[i - 1])) / DAY));
   gaps.sort((a, b) => a - b);
   const m = Math.floor(gaps.length / 2);
-  return gaps.length % 2 ? gaps[m] : Math.round((gaps[m - 1] + gaps[m]) / 2);
+  const interval = gaps.length % 2 ? gaps[m] : Math.round((gaps[m - 1] + gaps[m]) / 2);
+  return { interval, events: events.length };
 }
 
 // Estado de retención a partir de las fechas y el intervalo de tienda.
-function computeStatus({ anyLast, vetLast, shopLast, interval, hasSales }, today) {
+function computeStatus({ anyLast, vetLast, shopLast, interval, events, hasSales }, today) {
   if (!hasSales) return "sin_datos";
   const anyDays = daysSince(anyLast, today);
   if (anyDays !== null && anyDays <= ACTIVE_DAYS) return "activo";
 
-  // Pasados los 90 días sin actividad = al menos "en riesgo"; escala a inactivo si:
+  // Pasados los 90 días sin actividad = al menos "en riesgo". Solo escala a inactivo
+  // tras el suelo de 180 días sin NINGUNA actividad (evita falsos positivos con intervalos cortos).
   let inactive = false;
-  const vetDays  = daysSince(vetLast, today);
-  const shopDays = daysSince(shopLast, today);
-  if (vetDays  !== null && vetDays  > VET_INACTIVE) inactive = true;                 // clínica: 15 meses
-  if (interval && shopDays !== null && shopDays > 2 * interval) inactive = true;     // tienda: 2× intervalo
-  if (!interval && shopDays !== null && shopDays > STORE_FALLBACK_INACTIVE) inactive = true;
-  if (anyDays !== null && anyDays > STORE_FALLBACK_INACTIVE && vetDays === null) inactive = true;
+  if (anyDays !== null && anyDays > FLOOR_INACTIVE) {
+    const vetDays  = daysSince(vetLast, today);
+    const shopDays = daysSince(shopLast, today);
+    const reliableInterval = interval && events >= MIN_EVENTS;
+    if (vetDays !== null && vetDays > VET_INACTIVE) inactive = true;                          // clínica: 15 meses
+    if (reliableInterval && shopDays !== null && shopDays > 2 * interval) inactive = true;    // tienda: 2× intervalo (con patrón fiable)
+    if (!reliableInterval && shopDays !== null && shopDays > STORE_FALLBACK_INACTIVE) inactive = true;
+    if (vetDays === null) inactive = true;   // >180 días y sin relación con la clínica = perdido
+  }
   return inactive ? "inactivo" : "riesgo";
 }
 
@@ -122,8 +133,8 @@ exports.handler = async () => {
 
         const sl = fmtD(shopLast), vl = fmtD(vetLast), gl = fmtD(groomLast);
         const anyLast = [sl, vl, gl].filter(Boolean).sort().slice(-1)[0] || null;
-        const interval = medianInterval(shopDates);
-        const status = computeStatus({ anyLast, vetLast: vl, shopLast: sl, interval, hasSales: sales.length > 0 }, today);
+        const { interval, events } = purchaseInterval(shopDates);
+        const status = computeStatus({ anyLast, vetLast: vl, shopLast: sl, interval, events, hasSales: sales.length > 0 }, today);
         counts[status] = (counts[status] || 0) + 1;
 
         // wk_client_stats (upsert por wk_client_id)
