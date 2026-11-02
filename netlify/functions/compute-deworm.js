@@ -17,6 +17,10 @@ async function sb(method, path, body) {
   return r.json();
 }
 
+// Antelación: avisamos LEAD_DAYS antes de que se agote la protección, para que no
+// haya hueco sin desparasitar (el socio compra antes de quedarse descubierto).
+const LEAD_DAYS = 7;
+
 function addDays(dateStr, days) {
   const d = new Date(dateStr + "T00:00:00Z");
   d.setUTCDate(d.getUTCDate() + Math.round(days));
@@ -60,8 +64,9 @@ exports.handler = async (event) => {
       // Cobertura = días que protege una unidad comprada × cuántas compró.
       const cover = (p.protection_days || 0) * (ln.quantity || 1);
       if (!cover) continue;
-      const nextDue = addDays(ln.sale_date, cover);
-      if (nextDue <= today) { ln._days = p.protection_days; ln._nextDue = nextDue; ln._name = (socioMap[String(cid)] || {}).name; due.push(ln); }
+      const nextDue   = addDays(ln.sale_date, cover);         // día real en que se agota
+      const alertDate = addDays(nextDue, -LEAD_DAYS);          // avisamos 7 días antes
+      if (alertDate <= today) { ln._days = p.protection_days; ln._nextDue = nextDue; ln._name = (socioMap[String(cid)] || {}).name; due.push(ln); }
     }
 
     // Modo detalle: lista los vencidos con el cálculo (no crea avisos)
