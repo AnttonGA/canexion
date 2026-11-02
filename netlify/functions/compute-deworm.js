@@ -55,7 +55,8 @@ exports.handler = async () => {
       seen.add(cid);
       if (!socioMap[String(cid)]) continue;             // solo socios actuales
       const p = prodMap[ln.wk_service_id];
-      const cover = (p.protection_days || 0) * (ln.quantity || 1) * (p.units_per_pack || 1);
+      // Cobertura = días que protege una unidad comprada × cuántas compró.
+      const cover = (p.protection_days || 0) * (ln.quantity || 1);
       if (!cover) continue;
       if (addDays(ln.sale_date, cover) <= today) due.push(ln);
     }
