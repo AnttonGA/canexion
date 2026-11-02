@@ -1608,8 +1608,15 @@ async function importProductsFromWakyma(btn) {
   try {
     if (products === null) await loadProducts();
     const existing = new Set(products.map(p => p.wk_service_id));
-    const res  = await wk("/api/v3/products?limit=2000");
-    const list = Array.isArray(res) ? res : (res && res.data ? res.data : []);
+    let list = [], skip = 0;
+    for (let i = 0; i < 40; i++) {   // Wakyma pagina con skip (~3100 productos; tope 20.000)
+      if (btn) btn.textContent = "Importando… " + list.length;
+      const res  = await wk("/api/v3/products?limit=500&skip=" + skip);
+      const page = Array.isArray(res) ? res : (res && res.data ? res.data : []);
+      list = list.concat(page);
+      if (page.length < 500) break;
+      skip += 500;
+    }
     const nuevos = list
       .filter(p => p && p.id && !existing.has(String(p.id)))
       .map(p => ({ wk_service_id: String(p.id), name: p.name || "", type: "otro", species: "", active: true }));
