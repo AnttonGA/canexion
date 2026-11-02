@@ -131,6 +131,7 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--tp);min-h
 .feed-btn.wa{background:#25d366;border-color:#25d366;color:white;}
 .feed-btn:hover{opacity:.8;}
 .feed-result{cursor:pointer;font-family:'DM Sans',sans-serif;max-width:120px;}
+.feed-push{background:#eef2ff;border-color:#c7d2fe;color:#3730a3;}
 .feed-cap{display:inline-block;background:#fde8e8;color:#c0392b;border:1px solid #f5c6c6;border-radius:12px;padding:5px 10px;font-size:11px;font-weight:600;white-space:nowrap;text-align:center;}
 .hoy-head{display:flex;align-items:center;justify-content:space-between;padding:12px 16px 0;}
 .hoy-head-title{font-size:12px;font-weight:600;color:var(--tm);text-transform:uppercase;letter-spacing:.5px;}
@@ -1263,6 +1264,7 @@ let dewormAlertsMap  = {}; // wk_client_id → alert
 let dewormKeywords   = []; // [{id, keyword}, …]
 let wkStatsMap       = {}; // wk_client_id → wk_client_stats row
 let msgLogByClient   = {}; // clients.id → [{aviso_type, result, created_at}] (últimos ~45 días)
+let lastFeedItems    = []; // último render del feed (para acciones por índice, p.ej. push)
 const MONTHLY_CAP    = 2;  // máx. mensajes/mes por socio (avisos + campañas + invitaciones)
 
 // Plantillas de mensajes de "Hoy". Editables desde el CRM (tabla templates); si no hay
@@ -3813,7 +3815,8 @@ function buildFeedItems() {
 function msgLogFor(clientId) { return msgLogByClient[String(clientId)] || []; }
 function monthMsgCount(clientId) {
   const d = new Date(), y = d.getFullYear(), m = d.getMonth();
-  return msgLogFor(clientId).filter(x => { const t = new Date(x.created_at); return t.getFullYear() === y && t.getMonth() === m; }).length;
+  // El tope 2/mes es de WhatsApp; las push por wallet (channel "wallet") no cuentan.
+  return msgLogFor(clientId).filter(x => x.channel !== "wallet" && (() => { const t = new Date(x.created_at); return t.getFullYear() === y && t.getMonth() === m; })()).length;
 }
 function recentlyHandled(clientId, type, days = 14) {
   const cutoff = Date.now() - days * 86400000;
@@ -3850,12 +3853,17 @@ function renderFeed() {
   const colors = { deworm:"#4caf50", recovery:"#8e44ad", expiry:"#e67e22", anniversary:"#9c27b0", birthday:"#f59e0b", new:"#2196f3" };
 
   const today = new Date().toLocaleDateString("es-ES", { weekday:"long", day:"numeric", month:"long" });
+  lastFeedItems = items;
 
   el.innerHTML = `<div class="feed-date">${today} · ${items.length} acción${items.length !== 1 ? "es" : ""}</div>` +
     items.map((item, i) => {
       const color = colors[item.type] || "#888";
       const msg   = encodeURIComponent(item.isEu ? item.msgEu : item.msgEs);
       const waUrl = `https://wa.me/${item.fp}?text=${msg}`;
+      const cObj  = clients.find(x => x.id === item.clientId);
+      const pushBtn = (cObj && cObj.wallet_serial)
+        ? `<button class="feed-btn feed-push" onclick="sendPush(${i})" title="Notificación a la tarjeta wallet (no gasta el tope de WhatsApp)">📲 Push</button>`
+        : "";
       const capped = item.monthCount >= MONTHLY_CAP;
       const waCell = capped
         ? `<span class="feed-cap" title="Ya tiene ${item.monthCount} mensajes este mes">⛔ ${item.monthCount}/mes</span>
@@ -3877,6 +3885,7 @@ function renderFeed() {
         </div>
         <div class="feed-actions">
           ${waCell}
+          ${pushBtn}
           ${resultSel}
           <button class="feed-btn" onclick="openProfile('${item.clientId}')">👤 Ver</button>
         </div>
@@ -3915,6 +3924,31 @@ async function logResult(clientId, type, result, cardIdx) {
     const labels = { enviado: "Enviado", ya_lo_tengo: "Ya lo tiene", preparamelo: "Prepáramelo", sin_respuesta: "Sin respuesta", baja: "Baja" };
     showToast((labels[result] || "Guardado") + " ✓");
   } catch(e) { showToast("Error al guardar", true); }
+}
+
+// Envía una notificación push a la tarjeta wallet del socio (actualiza el pase).
+// Canal aparte de WhatsApp: no gasta el tope 2/mes. Solo llega a socios con la tarjeta
+// instalada (notifiedDevices lo indica).
+async function sendPush(i) {
+  const item = lastFeedItems[i];
+  if (!item) return;
+  const c = clients.find(x => x.id === item.clientId);
+  if (!c || !c.wallet_serial) { showToast("Este socio no tiene tarjeta wallet", true); return; }
+  const notification = (item.isEu ? item.msgEu : item.msgEs).slice(0, 256);
+  try {
+    const r = await fetch("/.netlify/functions/send-wallet-push", {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ serial: c.wallet_serial, name: c.name, pet: (c.pets || [])[0]?.name || "", clientId: c.id, notification })
+    });
+    const data = await r.json();
+    if (!r.ok || !data.ok) throw new Error(data.error || "Error al enviar push");
+    await sb("POST", "message_log", { body: { client_id: c.id, aviso_type: item.type, result: "push", channel: "wallet" } });
+    (msgLogByClient[String(c.id)] ||= []).push({ aviso_type: item.type, result: "push", channel: "wallet", created_at: new Date().toISOString() });
+    const card = document.getElementById(`feed-card-${i}`);
+    if (card) { card.classList.add("dismissed"); setTimeout(() => card.remove(), 200); }
+    setTimeout(() => { if (!document.querySelectorAll(".feed-card").length) renderFeed(); updateFeedBadge(); }, 250);
+    showToast(data.notifiedDevices > 0 ? `Push enviada a ${data.notifiedDevices} dispositivo(s) ✓` : "Tarjeta actualizada (sin dispositivos con la tarjeta instalada)");
+  } catch(e) { showToast("Error: " + e.message, true); }
 }
 
 // ── PLANTILLAS EDITABLES ─────────────────────────────────
