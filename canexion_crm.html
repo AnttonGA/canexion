@@ -1534,7 +1534,13 @@ function switchTab(tab) {
 let products = null; // null = aún no cargado
 
 async function loadProducts() {
-  products = (await sb("GET", "products", { order: "name.asc" })) || [];
+  // PostgREST devuelve máx 1000 filas por petición → paginar con limit/offset.
+  products = [];
+  for (let offset = 0, i = 0; i < 40; i++, offset += 1000) {
+    const page = (await sb("GET", "products", { filter: "limit=1000&offset=" + offset, order: "name.asc" })) || [];
+    products = products.concat(page);
+    if (page.length < 1000) break;
+  }
 }
 
 async function renderProductsTab() {
