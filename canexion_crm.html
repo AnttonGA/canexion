@@ -1497,7 +1497,7 @@ async function loadAll() {
       sb("GET", "deworm_alerts",   { filter: `status=eq.pending&reminder_date=lte.${todayISO}` }),
       sb("GET", "deworm_keywords", { order: "keyword" }),
       sb("GET", "wk_client_stats"),
-      sb("GET", "message_log",     { filter: `created_at=gte.${logSince}` })
+      sb("GET", "message_log",     { filter: `created_at=gte.${logSince}` }).catch(() => [])
     ]);
     msgLogByClient = {};
     (mld || []).forEach(m => { (msgLogByClient[String(m.client_id)] ||= []).push(m); });
