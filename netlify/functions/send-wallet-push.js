@@ -7,16 +7,27 @@
 // Variables de entorno: WALLETWALLET_KEY.
 
 const WALLETWALLET_KEY = process.env.WALLETWALLET_KEY;
+const SUPABASE_URL     = process.env.SUPABASE_URL;
+const SB_ANON          = (process.env.SUPABASE_KEY || process.env.SUPABASE_SERVICE_KEY); // clave de proyecto para validar el token de sesión
+
+async function requireStaff(event) {
+  const h = (event && event.headers) || {};
+  const token = ((h.authorization || h.Authorization || "").match(/Bearer\s+(.+)/i) || [])[1];
+  if (!token || !SUPABASE_URL || !SB_ANON) return false;
+  try { const r = await fetch(`${SUPABASE_URL}/auth/v1/user`, { headers: { "apikey": SB_ANON, "Authorization": "Bearer " + token } }); return r.ok; }
+  catch (e) { return false; }
+}
 
 exports.handler = async (event) => {
   const cors = {
     "Access-Control-Allow-Origin":  "*",
-    "Access-Control-Allow-Headers": "Content-Type",
+    "Access-Control-Allow-Headers": "Content-Type, Authorization",
     "Access-Control-Allow-Methods": "POST, OPTIONS",
     "Content-Type": "application/json"
   };
   if (event.httpMethod === "OPTIONS") return { statusCode: 204, headers: cors, body: "" };
   if (event.httpMethod !== "POST")    return { statusCode: 405, headers: cors, body: "" };
+  if (!(await requireStaff(event)))   return { statusCode: 401, headers: cors, body: JSON.stringify({ ok: false, error: "No autorizado" }) };
   if (!WALLETWALLET_KEY) return { statusCode: 500, headers: cors, body: JSON.stringify({ error: "WALLETWALLET_KEY no configurada" }) };
 
   try {

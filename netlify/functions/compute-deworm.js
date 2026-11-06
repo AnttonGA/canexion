@@ -7,6 +7,16 @@
 
 const SUPABASE_URL = process.env.SUPABASE_URL;
 const SUPABASE_KEY = process.env.SUPABASE_SERVICE_KEY || process.env.SUPABASE_KEY;
+const SB_ANON      = (process.env.SUPABASE_KEY || process.env.SUPABASE_SERVICE_KEY); // clave de proyecto para validar el token de sesión
+
+// El modo {detail:true} devuelve PII → solo personal autenticado.
+async function requireStaff(event) {
+  const h = (event && event.headers) || {};
+  const token = ((h.authorization || h.Authorization || "").match(/Bearer\s+(.+)/i) || [])[1];
+  if (!token || !SUPABASE_URL || !SB_ANON) return false;
+  try { const r = await fetch(`${SUPABASE_URL}/auth/v1/user`, { headers: { "apikey": SB_ANON, "Authorization": "Bearer " + token } }); return r.ok; }
+  catch (e) { return false; }
+}
 
 async function sb(method, path, body) {
   const headers = { "apikey": SUPABASE_KEY, "Authorization": "Bearer " + SUPABASE_KEY, "Content-Type": "application/json" };
@@ -37,6 +47,9 @@ exports.handler = async (event) => {
   const cors = { "Access-Control-Allow-Origin": "*", "Content-Type": "application/json" };
   let detail = false;
   try { detail = !!JSON.parse((event && event.body) || "{}").detail; } catch(e) {}
+  if (detail && !(await requireStaff(event))) {
+    return { statusCode: 401, headers: cors, body: JSON.stringify({ ok: false, error: "No autorizado" }) };
+  }
   try {
     const cfg = await loadConfig();
     if (cfg.lead_days != null) LEAD_DAYS = cfg.lead_days;

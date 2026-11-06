@@ -1153,6 +1153,12 @@ const WAKYMA_URL = "https://vets.wakyma.com";
 const _wkTS = [];
 const WK_MAX = 28;
 
+// Token de sesión del personal, para autenticar las llamadas a las funciones de Netlify.
+async function authToken() {
+  try { const { data: { session } } = await SB_AUTH.auth.getSession(); return (session && session.access_token) || ""; }
+  catch (e) { return ""; }
+}
+
 async function wk(endpoint) {
   while (true) {
     const now = Date.now();
@@ -1162,7 +1168,9 @@ async function wk(endpoint) {
     await new Promise(r => setTimeout(r, Math.max(wait, 100)));
   }
   _wkTS.push(Date.now());
-  const r = await fetch("/.netlify/functions/wk-proxy?e=" + encodeURIComponent(endpoint));
+  const r = await fetch("/.netlify/functions/wk-proxy?e=" + encodeURIComponent(endpoint), {
+    headers: { "Authorization": "Bearer " + (await authToken()) }
+  });
   if (!r.ok) throw new Error("Wakyma HTTP " + r.status);
   return r.json();
 }
@@ -1178,7 +1186,7 @@ async function wkPost(endpoint, body) {
   _wkTS.push(Date.now());
   const r = await fetch("/.netlify/functions/wk-proxy?e=" + encodeURIComponent(endpoint), {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: { "Content-Type": "application/json", "Authorization": "Bearer " + (await authToken()) },
     body: JSON.stringify(body)
   });
   if (!r.ok) throw new Error("Wakyma POST " + r.status);
@@ -1356,6 +1364,9 @@ async function sb(method, table, opts = {}) {
 }
 
 // ── HELPERS GENERALES ────────────────────────────────────
+// Escapa datos de cliente antes de meterlos en innerHTML (anti-XSS). Los nombres/mascotas
+// pueden venir del formulario público sin autenticar, así que NUNCA se interpolan crudos.
+function esc(s) { return (s == null ? "" : String(s)).replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c])); }
 function ini(n)  { return (n||"").split(" ").slice(0,2).map(w => w[0]||"").join("").toUpperCase(); }
 function avc(s)  { return s === "Gato" ? "cat" : s === "Perro" ? "dog" : "other"; }
 function fbd(d) {
@@ -1670,9 +1681,9 @@ function productRow(p) {
     opt(p.species, "", "especie") + opt(p.species, "perro", "Perro") +
     opt(p.species, "gato", "Gato") + opt(p.species, "ambos", "Ambos");
   const n = v => (v === null || v === undefined) ? "" : v;
-  const nm = (p.name || "—").replace(/"/g, "&quot;");
+  const nm = esc(p.name || "—");
   return `<div class="prod-row">
-    <div class="prod-name" title="${nm}">${p.name || "—"}</div>
+    <div class="prod-name" title="${nm}">${nm}</div>
     <select onchange="saveProductField('${sid}','type',this.value)">${typeSel}</select>
     <select onchange="saveProductField('${sid}','species',this.value)">${spSel}</select>
     <input type="number" step="0.1" placeholder="kg"   value="${n(p.sack_kg)}"         onchange="saveProductField('${sid}','sack_kg',this.value)"/>
@@ -1744,15 +1755,15 @@ function renderList(list) {
   }
   el.innerHTML = list.map(c => {
     const firstSpecies = c.pets.length ? c.pets[0].species : "";
-    const petNames     = c.pets.map(p => p.name).join(", ") || "—";
+    const petNames     = c.pets.map(p => esc(p.name)).join(", ") || "—";
     const active   = (c.benefits||[]).filter(b => b.status === "active" && b.dot !== "campaign").length;
     const campaign = (c.benefits||[]).filter(b => b.dot === "campaign"  && b.status === "active").length;
     const speciesIcon = firstSpecies === "Perro" ? "🐶" : firstSpecies === "Gato" ? "🐱" : firstSpecies ? "🐾" : "";
     return `<div class="cc" onclick="openProfile('${c.id}')">
-      <div class="av ${avc(firstSpecies)}">${ini(c.name)}</div>
+      <div class="av ${avc(firstSpecies)}">${esc(ini(c.name))}</div>
       <div class="ci">
-        <div class="cn">${c.name}</div>
-        <div class="cs">${speciesIcon ? speciesIcon + " " : ""}${petNames} · ${c.phone}</div>
+        <div class="cn">${esc(c.name)}</div>
+        <div class="cs">${speciesIcon ? speciesIcon + " " : ""}${petNames} · ${esc(c.phone)}</div>
         <div class="cbs">
           ${active   > 0 ? `<span class="badge active">${active} activo${active > 1 ? "s" : ""}</span>` : ""}
           ${campaign > 0 ? `<span class="badge campaign">${campaign} campaña${campaign > 1 ? "s" : ""}</span>` : ""}
@@ -1823,7 +1834,7 @@ function openProfile(id) {
   document.getElementById("pn").textContent  = c.name;
   document.getElementById("pph").textContent = c.phone;
   document.getElementById("psi").innerHTML =
-    "Miembro desde " + c.since +
+    "Miembro desde " + esc(c.since) +
     (c.wk_client_id
       ? ' &nbsp;<span style="background:rgba(200,230,203,.15);border:1px solid rgba(200,230,203,.25);padding:2px 8px;border-radius:20px;font-size:10px;color:rgba(200,230,203,.75);">⚡ Wakyma vinculado</span>'
       : ' &nbsp;<span style="opacity:.45;">· Sin vincular a Wakyma</span>') +
@@ -1838,10 +1849,10 @@ function openProfile(id) {
   const svcMap = {clinica:"Clínica",tienda:"Tienda",peluqueria:"Peluquería"};
   document.getElementById("pets-profile").innerHTML = c.pets.map(p => `
     <div class="pet-block">
-      <div class="pet-block-title">${p.name}</div>
+      <div class="pet-block-title">${esc(p.name)}</div>
       <div class="pgrid">
-        <div class="pcell"><div class="pclabel">Especie</div><div class="pcval">${p.species || "—"}</div></div>
-        <div class="pcell"><div class="pclabel">Raza</div><div class="pcval">${p.breed || "—"}</div></div>
+        <div class="pcell"><div class="pclabel">Especie</div><div class="pcval">${esc(p.species || "—")}</div></div>
+        <div class="pcell"><div class="pclabel">Raza</div><div class="pcval">${esc(p.breed || "—")}</div></div>
         <div class="pcell"><div class="pclabel">Cumpleaños</div><div class="pcval">${fbd(p.pet_bday)}</div></div>
       </div>
     </div>
@@ -2041,8 +2052,8 @@ function renderSaleDiscountCards() {
     const pct = b.discount ? `<span class="sale-pct">${b.discount}</span>` : "";
     return `<div class="sale-card">
       <div class="sale-card-body">
-        <div class="sale-card-name">${b.name}${pct}</div>
-        <div class="sale-card-desc">${b.desc || ""}</div>
+        <div class="sale-card-name">${esc(b.name)}${pct}</div>
+        <div class="sale-card-desc">${esc(b.desc || "")}</div>
       </div>
       <button class="cbtn" onclick="canjear(${x.i})">Canjear</button>
     </div>`;
@@ -2487,7 +2498,7 @@ function openNewPlanModal() {
   if (dt)  dt.value  = new Date().toISOString().slice(0, 10);
   if (pet) {
     pet.innerHTML = '<option value="">— Sin especificar —</option>' +
-      (current.pets || []).map(p => `<option value="${p.name}">${p.name}</option>`).join("");
+      (current.pets || []).map(p => `<option value="${esc(p.name)}">${esc(p.name)}</option>`).join("");
   }
   openModal("modal-plan");
 }
@@ -2964,7 +2975,7 @@ function runPreview() {
     ? `<div class="preview-excluded">⚠ ${excludedCount} miembro${excludedCount > 1 ? "s" : ""} excluido${excludedCount > 1 ? "s" : ""} por no haber aceptado comunicaciones comerciales</div>`
     : "";
   document.getElementById("prev-names").innerHTML   =
-    candidates.slice(0,8).map(c => `<div class="preview-name">· ${c.name} (${c.pets.map(p=>p.name).join(", ")})</div>`).join("") +
+    candidates.slice(0,8).map(c => `<div class="preview-name">· ${esc(c.name)} (${c.pets.map(p=>esc(p.name)).join(", ")})</div>`).join("") +
     (candidates.length > 8 ? `<div class="preview-name" style="color:var(--tm)">...y ${candidates.length-8} más</div>` : "") +
     excludedNote;
 
@@ -3065,7 +3076,7 @@ function showWaList(list, coupon, sendsMap = {}) {
       ? `<button class="wa-sent-btn camp-act-btn" data-done="0" onclick="markCampSent('${sendId}',this)" style="font-size:11px;padding:4px 9px;">✓ Enviado</button>`
       : "";
     return `<div class="wa-item">
-      <div class="wa-info"><div class="wa-name">${c.name}${langTag}</div><div class="wa-phone">${c.phone}</div></div>
+      <div class="wa-info"><div class="wa-name">${esc(c.name)}${langTag}</div><div class="wa-phone">${esc(c.phone)}</div></div>
       <div style="display:flex;gap:6px;align-items:center;">
         <a class="wa-btn" href="https://wa.me/${fullPhone}?text=${msg}" target="_blank">📱 WA</a>
         ${sentBtn}
@@ -3652,7 +3663,7 @@ function buildGroupMsgLinks() {
     const msg      = encodeURIComponent(tpl.replace(/\[NOMBRE\]/g, c.name.split(" ")[0]));
     const langTag  = c.language === "eu" ? ' <span style="font-size:10px;color:var(--pu);font-weight:500;">EUS</span>' : "";
     return `<div class="wa-item">
-      <div class="wa-info"><div class="wa-name">${c.name}${langTag}</div><div class="wa-phone">${c.phone}</div></div>
+      <div class="wa-info"><div class="wa-name">${esc(c.name)}${langTag}</div><div class="wa-phone">${esc(c.phone)}</div></div>
       <a class="wa-btn" href="https://wa.me/${fp}?text=${msg}" target="_blank">WhatsApp</a>
     </div>`;
   }).join("");
@@ -3699,7 +3710,7 @@ async function sendWelcomeCard(btn) {
   try {
     const r = await fetch("/.netlify/functions/crear-pase", {
       method:  "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: { "Content-Type": "application/json", "Authorization": "Bearer " + (await authToken()) },
       body:    JSON.stringify({ clientId: c.id, name: c.name, pet: petName, profileUrl })
     });
     const data = await r.json();
@@ -3924,8 +3935,8 @@ function renderFeed() {
       return `<div class="feed-card" id="feed-card-${i}" style="border-left-color:${color}">
         <div class="feed-icon">${item.icon}</div>
         <div class="feed-body">
-          <div class="feed-title">${item.title}</div>
-          <div class="feed-sub">${item.subtitle}</div>
+          <div class="feed-title">${esc(item.title)}</div>
+          <div class="feed-sub">${esc(item.subtitle)}</div>
         </div>
         <div class="feed-actions">
           ${waCell}
@@ -3984,7 +3995,7 @@ async function sendPush(i) {
   const notification = (item.isEu ? item.msgEu : item.msgEs).slice(0, 256);
   try {
     const r = await fetch("/.netlify/functions/send-wallet-push", {
-      method: "POST", headers: { "Content-Type": "application/json" },
+      method: "POST", headers: { "Content-Type": "application/json", "Authorization": "Bearer " + (await authToken()) },
       body: JSON.stringify({ serial: c.wallet_serial, name: c.name, pet: (c.pets || [])[0]?.name || "", clientId: c.id, notification })
     });
     const data = await r.json();
@@ -4443,9 +4454,9 @@ function placeMapMarker(c, lat, lng, bounds) {
   });
   marker.bindPopup(`
     <div style="font-family:'DM Sans',sans-serif;min-width:170px;padding:2px 0;">
-      <div style="font-weight:500;font-size:14px;margin-bottom:4px;color:#1a2a1c;">${c.name}</div>
-      <div style="font-size:12px;color:#4a6050;margin-bottom:2px;">🐾 ${petStr}</div>
-      <div style="font-size:12px;color:#8aaa90;margin-bottom:8px;">${locStr}</div>
+      <div style="font-weight:500;font-size:14px;margin-bottom:4px;color:#1a2a1c;">${esc(c.name)}</div>
+      <div style="font-size:12px;color:#4a6050;margin-bottom:2px;">🐾 ${esc(petStr)}</div>
+      <div style="font-size:12px;color:#8aaa90;margin-bottom:8px;">${esc(locStr)}</div>
       <button onclick="openProfileFromMap('${c.id}')"
         style="width:100%;background:#2d6a35;color:white;border:none;border-radius:6px;padding:7px 0;font-size:12px;font-weight:500;cursor:pointer;font-family:'DM Sans',sans-serif;">
         Ver perfil →
