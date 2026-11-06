@@ -121,7 +121,9 @@ exports.handler = async (event) => {
       });
 
     if (nuevos.length) {
-      for (let i = 0; i < nuevos.length; i += 100) await sb("POST", "deworm_alerts", nuevos.slice(i, i + 100));
+      // on_conflict=wk_sale_id → ignora de verdad los avisos ya existentes para esa venta
+      // (p.ej. uno ya marcado como enviado), en vez de petar con 409 y abortar la pasada.
+      for (let i = 0; i < nuevos.length; i += 100) await sb("POST", "deworm_alerts?on_conflict=wk_sale_id", nuevos.slice(i, i + 100));
     }
 
     return { statusCode: 200, headers: cors, body: JSON.stringify({ ok: true, antiparasitarios: ids.length, socios_due: due.length, created: nuevos.length }) };
