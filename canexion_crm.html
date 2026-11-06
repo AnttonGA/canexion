@@ -804,7 +804,10 @@ input:checked+.togslider:before{transform:translateX(16px);}
   <div id="sy" class="screen">
     <div class="hoy-head">
       <span class="hoy-head-title">Acciones de hoy</span>
-      <button class="hoy-tpl-btn" onclick="openTemplatesModal()">⚙️ Plantillas</button>
+      <span style="display:flex;gap:8px;">
+        <button class="hoy-tpl-btn" onclick="openPhasesModal()">🎚 Avisos activos</button>
+        <button class="hoy-tpl-btn" onclick="openTemplatesModal()">⚙️ Plantillas</button>
+      </span>
     </div>
     <div id="sy-list" class="feed-wrap">
       <div class="feed-empty"><div class="spinner"></div></div>
@@ -1037,6 +1040,18 @@ input:checked+.togslider:before{transform:translateX(16px);}
   </div>
 </div>
 
+<!-- ── MODAL: AVISOS ACTIVOS (fases) ──────────────────── -->
+<div class="overlay" id="modal-phases" onclick="closeModalOut(event,'modal-phases')">
+  <div class="msheet">
+    <div class="mhandle"></div>
+    <div class="mtitle">Avisos activos</div>
+    <div class="info-chip" style="margin-bottom:10px;">Activa o desactiva qué tipos de aviso aparecen en "Hoy". Útil para arrancar el piloto por fases.</div>
+    <div id="phases-body"></div>
+    <button class="subbtn" id="sbtn-phases" onclick="savePhases()">Guardar</button>
+    <span class="cancelink" onclick="closeModal('modal-phases')">Cancelar</span>
+  </div>
+</div>
+
 <!-- ── MODAL: PLANTILLAS DE MENSAJES ──────────────────── -->
 <div class="overlay" id="modal-templates" onclick="closeModalOut(event,'modal-templates')">
   <div class="msheet" style="max-height:88vh;overflow-y:auto;">
@@ -1236,6 +1251,8 @@ const MONTHLY_CAP    = 2;  // máx. mensajes/mes por socio (avisos + campañas +
 // override, se usan estos textos por defecto. Variables: {nombre} {producto} {mascota}
 // {cupon} {fecha} {anios}.
 let templatesMap = {}; // type → { es: texto, eu: texto }
+let feedPhases   = {}; // type → bool (aviso activo en "Hoy"); ausente = activo
+function phaseEnabled(type) { return feedPhases[type] !== false; }
 const DEFAULT_TEMPLATES = {
   deworm: {
     es: "¡Hola {nombre}! 💊 Han pasado los 2 meses y medio desde que compraste {producto}. ¿Habéis podido hacer la desparasitación? Si necesitáis más producto, podéis pasaros por la clínica 🐾",
@@ -1526,7 +1543,7 @@ async function loadAll() {
   try {
     const todayISO = new Date().toISOString().split("T")[0];
     const logSince = new Date(Date.now() - 45 * 86400000).toISOString();
-    const [cd, cpd, btd, dcd, dad, wksd, mld, tpl] = await Promise.all([
+    const [cd, cpd, btd, dcd, dad, wksd, mld, tpl, stg] = await Promise.all([
       sb("GET", "clients",           { order: "created_at.desc" }),
       sb("GET", "campaigns",         { order: "created_at.desc" }),
       sb("GET", "benefit_templates", { order: "order_index"     }),
@@ -1534,12 +1551,14 @@ async function loadAll() {
       sb("GET", "deworm_alerts",   { filter: `status=eq.pending&reminder_date=lte.${todayISO}` }),
       sb("GET", "wk_client_stats"),
       sb("GET", "message_log",     { filter: `created_at=gte.${logSince}` }).catch(() => []),
-      sb("GET", "templates").catch(() => [])
+      sb("GET", "templates").catch(() => []),
+      sb("GET", "settings").catch(() => [])
     ]);
     msgLogByClient = {};
     (mld || []).forEach(m => { (msgLogByClient[String(m.client_id)] ||= []).push(m); });
     templatesMap = {};
     (tpl || []).forEach(t => { (templatesMap[t.type] ||= {})[t.language] = t.text; });
+    feedPhases = (((stg || []).find(s => s.key === "feed_phases") || {}).value) || {};
     // Deworm y Wakyma stats deben estar listos antes de mapClient
     dewormAlertsMap = {};
     (dad  || []).forEach(a => { dewormAlertsMap[String(a.wk_client_id)] = a; });
@@ -3805,6 +3824,7 @@ function buildFeedItems() {
   // y anotar cuántos mensajes lleva cada socio este mes (para el tope 2/mes).
   const out = items
     .filter(it => {
+      if (!phaseEnabled(it.type)) return false;   // tipo de aviso desactivado por fase
       const c = clients.find(x => x.id === it.clientId);
       if (!c) return false;
       // Consentimiento por tipo: los cupones comerciales ↔ marketing_consent; el resto
@@ -4097,6 +4117,33 @@ async function saveTemplates() {
     showToast("Plantillas guardadas ✓");
   } catch(e) { showToast("Error al guardar plantillas", true); }
   finally { if (btn) { btn.disabled = false; btn.textContent = "Guardar plantillas"; } }
+}
+
+// ── INTERRUPTORES POR FASE ───────────────────────────────
+function openPhasesModal() {
+  const body = document.getElementById("phases-body");
+  body.innerHTML = TEMPLATE_DEFS.map(def => `
+    <div class="frow-check" style="padding:9px 2px;border-bottom:1px solid var(--bd);">
+      <label class="flabel" for="ph-${def.type}">${def.label}</label>
+      <label class="togswitch"><input type="checkbox" id="ph-${def.type}" ${phaseEnabled(def.type) ? "checked" : ""}/><span class="togslider"></span></label>
+    </div>`).join("");
+  openModal("modal-phases");
+}
+
+async function savePhases() {
+  const btn = document.getElementById("sbtn-phases");
+  if (btn) { btn.disabled = true; btn.textContent = "Guardando..."; }
+  try {
+    const val = {};
+    for (const def of TEMPLATE_DEFS) { const el = document.getElementById(`ph-${def.type}`); val[def.type] = el ? el.checked : true; }
+    await sb("POST", "settings", { filter: "on_conflict=key", prefer: "resolution=merge-duplicates,return=minimal", body: { key: "feed_phases", value: val, updated_at: new Date().toISOString() } });
+    feedPhases = val;
+    closeModal("modal-phases");
+    renderFeed();
+    updateFeedBadge();
+    showToast("Avisos actualizados ✓");
+  } catch(e) { showToast("Error al guardar", true); }
+  finally { if (btn) { btn.disabled = false; btn.textContent = "Guardar"; } }
 }
 
 function sendDewormWA() {
