@@ -202,9 +202,21 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--tp);min-h
         <div class="check-group">
           <label class="check-item"><input type="checkbox" value="clinica" onchange="updateBenefitsPreview()"/> Clínica veterinaria</label>
           <label class="check-item"><input type="checkbox" value="tienda" onchange="updateBenefitsPreview()"/> Tienda / pienso</label>
-          <label class="check-item"><input type="checkbox" value="peluqueria" onchange="updateBenefitsPreview()"/> Peluquería</label>
         </div>
         <div class="field-error" id="err-fsv">Selecciona al menos un servicio</div>
+      </div>
+
+      <div class="fg">
+        <label class="fl">¿Cómo nos conociste?</label>
+        <select class="fi" id="how-found">
+          <option value="">Prefiero no decirlo</option>
+          <option value="recomendacion">Recomendación / boca a boca</option>
+          <option value="clinica">Ya era cliente de la clínica</option>
+          <option value="paso_delante">Pasaba por delante</option>
+          <option value="google">Google / internet</option>
+          <option value="redes">Redes sociales</option>
+          <option value="otro">Otro</option>
+        </select>
       </div>
 
       <!-- PREVIEW DE BENEFICIOS (dinámico) -->
@@ -222,8 +234,12 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--tp);min-h
           <span>He leído y acepto la <a class="privacy-link" onclick="openPolicy()" href="javascript:void(0)">política de privacidad</a> para la gestión de mi membresía en Familia Canexion. *</span>
         </label>
         <label class="privacy-item">
+          <input type="checkbox" id="check-service" checked/>
+          <span>Quiero recibir <strong>avisos de servicio</strong> sobre mi mascota: recordatorios de desparasitación, reposición de pienso y salud (opcional, recomendado).</span>
+        </label>
+        <label class="privacy-item">
           <input type="checkbox" id="check-marketing"/>
-          <span>Acepto recibir comunicaciones comerciales y promociones de Canexion (opcional).</span>
+          <span>Acepto recibir <strong>comunicaciones comerciales</strong> y promociones de Canexion (opcional).</span>
         </label>
         <label class="privacy-item">
           <input type="checkbox" id="check-photos"/>
@@ -527,6 +543,8 @@ async function submitForm() {
         pet_bday:    pets[0].pet_bday || null,
         svc:               JSON.stringify(svcArray),
         marketing_consent: document.getElementById("check-marketing").checked,
+        service_consent:   document.getElementById("check-service").checked,
+        how_found:         document.getElementById("how-found").value,
         photo_consent:     document.getElementById("check-photos").checked,
         benefits
       })

@@ -1413,6 +1413,7 @@ function mapClient(c) {
     birthdayPets:      birthdayPets,
     petAge:            pets.length > 0 ? getPetAge(pets[0].pet_bday) : null,
     marketing_consent: c.marketing_consent === true,
+    service_consent:   c.service_consent !== false,   // por defecto true (membresía)
     photo_consent:     c.photo_consent === true,
     wk_client_id:      c.wk_client_id || null,
     address:           c.address || "",
@@ -1866,6 +1867,10 @@ function openProfile(id) {
 
   // Consentimientos
   document.getElementById("p-consent").innerHTML =
+    (c.service_consent
+      ? '<span class="consent-badge yes">✓ Avisos de servicio</span>'
+      : '<span class="consent-badge no">✕ Sin avisos de servicio</span>') +
+    " " +
     (c.marketing_consent
       ? '<span class="consent-badge yes">✓ Comunicaciones comerciales</span>'
       : '<span class="consent-badge no">✕ Sin comunicaciones</span>') +
@@ -3775,12 +3780,23 @@ function buildFeedItems() {
   // Quitar avisos de socios dados de baja o ya gestionados en los últimos 14 días,
   // y anotar cuántos mensajes lleva cada socio este mes (para el tope 2/mes).
   const out = items
-    .filter(it => !isUnsubscribed(it.clientId) && !recentlyHandled(it.clientId, it.type))
+    .filter(it => {
+      const c = clients.find(x => x.id === it.clientId);
+      if (!c) return false;
+      // Consentimiento por tipo: los cupones comerciales ↔ marketing_consent; el resto
+      // (desparasitación, recuperación, cumpleaños, aniversario, nuevo) ↔ service_consent.
+      const ok = COMMERCIAL_FEED_TYPES.has(it.type) ? c.marketing_consent : c.service_consent;
+      if (!ok) return false;
+      return !recentlyHandled(it.clientId, it.type);
+    })
     .map(it => ({ ...it, monthCount: monthMsgCount(it.clientId) }));
 
   out.sort((a, b) => a.priority - b.priority || a.clientName.localeCompare(b.clientName));
   return out;
 }
+
+// Tipos de aviso del feed que son COMERCIALES (requieren marketing_consent).
+const COMMERCIAL_FEED_TYPES = new Set(["expiry"]);
 
 // ── Registro de mensajes / tope mensual ──────────────────
 function msgLogFor(clientId) { return msgLogByClient[String(clientId)] || []; }
@@ -3792,9 +3808,6 @@ function monthMsgCount(clientId) {
 function recentlyHandled(clientId, type, days = 14) {
   const cutoff = Date.now() - days * 86400000;
   return msgLogFor(clientId).some(x => x.aviso_type === type && new Date(x.created_at).getTime() >= cutoff);
-}
-function isUnsubscribed(clientId) {
-  return msgLogFor(clientId).some(x => x.result === "baja");
 }
 
 function updateFeedBadge() {
@@ -3884,8 +3897,11 @@ async function logResult(clientId, type, result, cardIdx) {
       if (c) c.retention_contacted_at = nowIso;
     }
     if (result === "baja") {
-      await sb("PATCH", "clients", { filter: `id=eq.${clientId}`, body: { marketing_consent: false } });
-      if (c) c.marketing_consent = false;
+      // Baja del consentimiento que corresponde al tipo de aviso: los cupones comerciales
+      // dan de baja el comercial; el resto (servicio) da de baja los avisos de servicio.
+      const field = COMMERCIAL_FEED_TYPES.has(type) ? "marketing_consent" : "service_consent";
+      await sb("PATCH", "clients", { filter: `id=eq.${clientId}`, body: { [field]: false } });
+      if (c) c[field] = false;
     }
 
     const card = document.getElementById(`feed-card-${cardIdx}`);

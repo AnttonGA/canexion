@@ -107,7 +107,11 @@ exports.handler = async (event) => {
     const payload = JSON.parse(event.body || "{}");
     const { name, phone, email, postal_code, address, language,
             pets, svc, benefits, marketing_consent, photo_consent,
+            service_consent, how_found,
             since, pet, species, pet_bday } = payload;
+    // Por defecto los avisos de servicio van marcados (membresía); si no viene, true.
+    const serviceOk = service_consent === undefined ? true : !!service_consent;
+    const nowIso = new Date().toISOString();
 
     if (!name || !phone || !postal_code) {
       return { statusCode: 400, headers: cors, body: JSON.stringify({ error: "Faltan campos obligatorios" }) };
@@ -194,6 +198,10 @@ exports.handler = async (event) => {
       address:           address  || "",
       language:          language || "es",
       marketing_consent: !!marketing_consent,
+      marketing_consent_at: marketing_consent ? nowIso : null,
+      service_consent:   serviceOk,
+      service_consent_at: serviceOk ? nowIso : null,
+      how_found:         how_found || "",
       photo_consent:     !!photo_consent,
       wk_client_id:      wkClientId,
       notes:             ""
