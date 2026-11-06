@@ -132,6 +132,20 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--tp);min-h
 .feed-btn:hover{opacity:.8;}
 .feed-result{cursor:pointer;font-family:'DM Sans',sans-serif;max-width:120px;}
 .feed-push{background:#eef2ff;border-color:#c7d2fe;color:#3730a3;}
+.med-wrap{padding:14px 16px 80px;display:flex;flex-direction:column;gap:16px;}
+.med-sec{background:var(--sf);border:1px solid var(--bd);border-radius:var(--rs);padding:14px 16px;}
+.med-sec-title{font-size:12px;font-weight:600;color:var(--tm);text-transform:uppercase;letter-spacing:.5px;margin-bottom:12px;}
+.med-tiles{display:grid;grid-template-columns:repeat(auto-fit,minmax(104px,1fr));gap:10px;}
+.med-tile{background:var(--gg);border:1px solid var(--bd);border-radius:12px;padding:12px 10px;text-align:center;}
+.med-tile-num{font-size:25px;font-weight:700;color:var(--tp);line-height:1;}
+.med-tile-lbl{font-size:11px;color:var(--tm);margin-top:5px;}
+.med-tile-sub{font-size:10px;color:var(--tm);margin-top:2px;}
+.med-bar-row{display:flex;align-items:center;gap:10px;margin-bottom:7px;font-size:12px;}
+.med-bar-lbl{width:118px;flex-shrink:0;color:var(--ts);}
+.med-bar-track{flex:1;height:16px;background:var(--gg);border-radius:8px;overflow:hidden;}
+.med-bar-fill{height:100%;border-radius:8px;min-width:2px;transition:width .3s;}
+.med-bar-val{width:40px;flex-shrink:0;text-align:right;font-weight:600;color:var(--tp);}
+.med-note{font-size:11px;color:var(--tm);margin-top:10px;font-style:italic;}
 .feed-cap{display:inline-block;background:#fde8e8;color:#c0392b;border:1px solid #f5c6c6;border-radius:12px;padding:5px 10px;font-size:11px;font-weight:600;white-space:nowrap;text-align:center;}
 .hoy-head{display:flex;align-items:center;justify-content:space-between;padding:12px 16px 0;}
 .hoy-head-title{font-size:12px;font-weight:600;color:var(--tm);text-transform:uppercase;letter-spacing:.5px;}
@@ -520,6 +534,7 @@ input:checked+.togslider:before{transform:translateX(16px);}
     <div class="nav-tab"        id="tab-benefits" onclick="switchTab('benefits')">Beneficios</div>
     <div class="nav-tab"        id="tab-products" onclick="switchTab('products')">🛒 Catálogo</div>
     <div class="nav-tab"        id="tab-map"      onclick="switchTab('map')">🗺 Mapa</div>
+    <div class="nav-tab"        id="tab-med"      onclick="switchTab('med')">📊 Medición</div>
   </div>
 
   <!-- SCREEN: MIEMBROS -->
@@ -825,6 +840,13 @@ input:checked+.togslider:before{transform:translateX(16px);}
       <button class="map-relocate-btn" onclick="relocateAllClients()" title="Borra las ubicaciones guardadas y recalcula todas con el motor actual">🔄 Reubicar todos</button>
     </div>
     <div id="map-container"></div>
+  </div>
+
+  <!-- SCREEN: MEDICIÓN -->
+  <div id="smed" class="screen">
+    <div id="med-body" class="med-wrap">
+      <div class="loading-state"><div class="spinner"></div>Calculando métricas...</div>
+    </div>
   </div>
 
 </div>
@@ -1542,7 +1564,7 @@ async function loadAll() {
 
 // ── TABS ──────────────────────────────────────────────────
 function switchTab(tab) {
-  ["clients","today","camps","benefits","products","map"].forEach(t => {
+  ["clients","today","camps","benefits","products","map","med"].forEach(t => {
     document.getElementById("tab-" + t).classList.toggle("active", t === tab);
   });
   document.getElementById("ss").classList.toggle("active", tab === "clients");
@@ -1551,12 +1573,14 @@ function switchTab(tab) {
   document.getElementById("sb").classList.toggle("active", tab === "benefits");
   document.getElementById("sprod").classList.toggle("active", tab === "products");
   document.getElementById("sm").classList.toggle("active", tab === "map");
+  document.getElementById("smed").classList.toggle("active", tab === "med");
   document.getElementById("fab").style.display = tab === "clients" ? "flex" : "none";
-  const titles = { clients: "Panel de fidelización", today: "Acciones de hoy", camps: "Campañas", benefits: "Beneficios", products: "Catálogo de productos", map: "Mapa de miembros" };
+  const titles = { clients: "Panel de fidelización", today: "Acciones de hoy", camps: "Campañas", benefits: "Beneficios", products: "Catálogo de productos", map: "Mapa de miembros", med: "Medición del piloto" };
   document.getElementById("tb-title").textContent = titles[tab] || "";
   if (tab === "map")      renderMap();
   if (tab === "today")    renderFeed();
   if (tab === "products") renderProductsTab();
+  if (tab === "med")      renderMeasurement();
 }
 
 // ── CATÁLOGO DE PRODUCTOS ─────────────────────────────────
@@ -3936,6 +3960,92 @@ async function sendPush(i) {
     setTimeout(() => { if (!document.querySelectorAll(".feed-card").length) renderFeed(); updateFeedBadge(); }, 250);
     showToast(data.notifiedDevices > 0 ? `Push enviada a ${data.notifiedDevices} dispositivo(s) ✓` : "Tarjeta actualizada (sin dispositivos con la tarjeta instalada)");
   } catch(e) { showToast("Error: " + e.message, true); }
+}
+
+// ── PANEL DE MEDICIÓN ────────────────────────────────────
+function medBar(label, val, max, color) {
+  const pct = max ? Math.round((val / max) * 100) : 0;
+  return `<div class="med-bar-row"><div class="med-bar-lbl">${label}</div><div class="med-bar-track"><div class="med-bar-fill" style="width:${pct}%;background:${color}"></div></div><div class="med-bar-val">${val}</div></div>`;
+}
+
+function renderMeasurement() {
+  const el = document.getElementById("med-body");
+  if (!el) return;
+  const now = new Date(), y = now.getFullYear(), mo = now.getMonth();
+  const mesTxt = now.toLocaleDateString("es-ES", { month: "long", year: "numeric" });
+
+  // ── Socios (estado actual) ──
+  const est = { activo: 0, riesgo: 0, inactivo: 0, sin_datos: 0, sin_calcular: 0 };
+  let conWallet = 0, conServicio = 0, conComercial = 0, nuevosMes = 0;
+  for (const c of clients) {
+    const s = c.retention_status || "sin_calcular";
+    est[s] = (est[s] || 0) + 1;
+    if (c.wallet_serial) conWallet++;
+    if (c.service_consent) conServicio++;
+    if (c.marketing_consent) conComercial++;
+    if (c.created_at) { const d = new Date(c.created_at); if (d.getFullYear() === y && d.getMonth() === mo) nuevosMes++; }
+  }
+  const total = clients.length;
+  const pctWallet = total ? Math.round(conWallet / total * 100) : 0;
+
+  // ── Avisos del mes (desde message_log) ──
+  const logs = [];
+  for (const k in msgLogByClient) for (const x of msgLogByClient[k]) {
+    const t = new Date(x.created_at);
+    if (t.getFullYear() === y && t.getMonth() === mo) logs.push(x);
+  }
+  const waLogs   = logs.filter(x => x.channel !== "wallet");
+  const pushLogs = logs.filter(x => x.channel === "wallet");
+  const r = { enviado: 0, ya_lo_tengo: 0, preparamelo: 0, sin_respuesta: 0, baja: 0 };
+  for (const x of waLogs) if (r[x.result] !== undefined) r[x.result]++;
+  const productiva = r.ya_lo_tengo + r.preparamelo;
+  const tasa = waLogs.length ? Math.round(productiva / waLogs.length * 100) : 0;
+  const maxR = Math.max(1, ...Object.values(r));
+
+  el.innerHTML = `
+    <div class="med-sec">
+      <div class="med-sec-title">Socios · estado actual</div>
+      <div class="med-tiles">
+        <div class="med-tile"><div class="med-tile-num">${total}</div><div class="med-tile-lbl">Total</div></div>
+        <div class="med-tile"><div class="med-tile-num" style="color:#2e7d32">${est.activo}</div><div class="med-tile-lbl">🟢 Activos</div></div>
+        <div class="med-tile"><div class="med-tile-num" style="color:#b45309">${est.riesgo}</div><div class="med-tile-lbl">🟡 En riesgo</div></div>
+        <div class="med-tile"><div class="med-tile-num" style="color:#c0392b">${est.inactivo}</div><div class="med-tile-lbl">🔴 Inactivos</div></div>
+        <div class="med-tile"><div class="med-tile-num" style="color:var(--tm)">${est.sin_datos + est.sin_calcular}</div><div class="med-tile-lbl">⚪ Sin datos</div></div>
+      </div>
+      <div style="margin-top:14px">
+        ${medBar("Activos", est.activo, total, "#2e7d32")}
+        ${medBar("En riesgo", est.riesgo, total, "#e0a800")}
+        ${medBar("Inactivos", est.inactivo, total, "#c0392b")}
+      </div>
+    </div>
+
+    <div class="med-sec">
+      <div class="med-sec-title">Adopción y permisos</div>
+      <div class="med-tiles">
+        <div class="med-tile"><div class="med-tile-num">${conWallet}</div><div class="med-tile-lbl">📲 Con tarjeta</div><div class="med-tile-sub">${pctWallet}% del total</div></div>
+        <div class="med-tile"><div class="med-tile-num">${conServicio}</div><div class="med-tile-lbl">✓ Consent. servicio</div></div>
+        <div class="med-tile"><div class="med-tile-num">${conComercial}</div><div class="med-tile-lbl">✓ Consent. comercial</div></div>
+        <div class="med-tile"><div class="med-tile-num">${nuevosMes}</div><div class="med-tile-lbl">✨ Altas del mes</div></div>
+      </div>
+    </div>
+
+    <div class="med-sec">
+      <div class="med-sec-title">Avisos · ${mesTxt}</div>
+      <div class="med-tiles">
+        <div class="med-tile"><div class="med-tile-num">${waLogs.length}</div><div class="med-tile-lbl">📱 Por WhatsApp</div></div>
+        <div class="med-tile"><div class="med-tile-num">${pushLogs.length}</div><div class="med-tile-lbl">📲 Por push</div></div>
+        <div class="med-tile"><div class="med-tile-num">${tasa}%</div><div class="med-tile-lbl">Tasa de respuesta</div><div class="med-tile-sub">útil / enviados</div></div>
+        <div class="med-tile"><div class="med-tile-num" style="color:#c0392b">${r.baja}</div><div class="med-tile-lbl">🚫 Bajas</div></div>
+      </div>
+      <div style="margin-top:14px">
+        ${medBar("Enviado", r.enviado, maxR, "#3498db")}
+        ${medBar("Ya lo tiene", r.ya_lo_tengo, maxR, "#2e7d32")}
+        ${medBar("Prepáramelo", r.preparamelo, maxR, "#8e44ad")}
+        ${medBar("Sin respuesta", r.sin_respuesta, maxR, "#e67e22")}
+        ${medBar("Baja", r.baja, maxR, "#c0392b")}
+      </div>
+      <div class="med-note">La compra a 14 días y los socios recuperados requieren el job de reconciliación (próximamente). Los datos de avisos cubren los últimos ~45 días.</div>
+    </div>`;
 }
 
 // ── PLANTILLAS EDITABLES ─────────────────────────────────
