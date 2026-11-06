@@ -4002,6 +4002,12 @@ function renderMeasurement() {
   const tasa = waLogs.length ? Math.round(productiva / waLogs.length * 100) : 0;
   const maxR = Math.max(1, ...Object.values(r));
 
+  // Reconciliación (compra en los 14 días tras el aviso)
+  const reconciled  = logs.filter(x => x.reconciled_at);
+  const bought      = reconciled.filter(x => x.purchased_14d);
+  const compra14    = reconciled.length ? Math.round(bought.length / reconciled.length * 100) : 0;
+  const recuperados = logs.filter(x => x.aviso_type === "recovery" && x.purchased_14d).length;
+
   el.innerHTML = `
     <div class="med-sec">
       <div class="med-sec-title">Socios · estado actual</div>
@@ -4035,6 +4041,8 @@ function renderMeasurement() {
         <div class="med-tile"><div class="med-tile-num">${waLogs.length}</div><div class="med-tile-lbl">📱 Por WhatsApp</div></div>
         <div class="med-tile"><div class="med-tile-num">${pushLogs.length}</div><div class="med-tile-lbl">📲 Por push</div></div>
         <div class="med-tile"><div class="med-tile-num">${tasa}%</div><div class="med-tile-lbl">Tasa de respuesta</div><div class="med-tile-sub">útil / enviados</div></div>
+        <div class="med-tile"><div class="med-tile-num" style="color:#2e7d32">${compra14}%</div><div class="med-tile-lbl">🛒 Compra a 14 días</div><div class="med-tile-sub">${bought.length}/${reconciled.length} reconciliados</div></div>
+        <div class="med-tile"><div class="med-tile-num" style="color:#2e7d32">${recuperados}</div><div class="med-tile-lbl">💚 Recuperados</div><div class="med-tile-sub">inactivo → compró</div></div>
         <div class="med-tile"><div class="med-tile-num" style="color:#c0392b">${r.baja}</div><div class="med-tile-lbl">🚫 Bajas</div></div>
       </div>
       <div style="margin-top:14px">
@@ -4044,7 +4052,7 @@ function renderMeasurement() {
         ${medBar("Sin respuesta", r.sin_respuesta, maxR, "#e67e22")}
         ${medBar("Baja", r.baja, maxR, "#c0392b")}
       </div>
-      <div class="med-note">La compra a 14 días y los socios recuperados requieren el job de reconciliación (próximamente). Los datos de avisos cubren los últimos ~45 días.</div>
+      <div class="med-note">"Compra a 14 días" se calcula sobre los avisos ya reconciliados (ventana cerrada); los de menos de 14 días siguen abiertos. Los datos de avisos cubren los últimos ~45 días.</div>
     </div>`;
 }
 

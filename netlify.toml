@@ -9,3 +9,6 @@
 
 [functions."wk-estados-scan"]
   schedule = "30 8 * * *"
+
+[functions."wk-reconcile-scan"]
+  schedule = "0 9 * * *"
