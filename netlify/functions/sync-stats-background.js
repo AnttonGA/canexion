@@ -18,11 +18,11 @@ const EMP_ROLE = {
   "sara": "grooming"
 };
 
-// Umbrales (reglas del spec). Fáciles de tocar.
-const ACTIVE_DAYS   = 90;    // activo si hay compra/visita en los últimos 90 días
-const VET_INACTIVE  = 456;   // 15 meses sin visita al vet → inactivo
-const STORE_FALLBACK_INACTIVE = 180; // sin intervalo fiable, inactivo a 180 días
-const FLOOR_INACTIVE = 180;  // suelo: nunca inactivo antes de 180 días sin NINGUNA actividad
+// Umbrales (reglas del spec). Editables desde el CRM (settings key=config).
+let ACTIVE_DAYS   = 90;    // activo si hay compra/visita en los últimos 90 días
+let VET_INACTIVE  = 456;   // 15 meses sin visita al vet → inactivo
+let STORE_FALLBACK_INACTIVE = 180; // sin intervalo fiable, inactivo a 180 días
+let FLOOR_INACTIVE = 180;  // suelo: nunca inactivo antes de 180 días sin NINGUNA actividad
 const COLLAPSE_DAYS  = 7;    // compras a ≤7 días se cuentan como un solo evento (tickets del mismo viaje)
 const MIN_EVENTS     = 3;    // nº mínimo de eventos de compra para fiarse del intervalo
 
@@ -54,6 +54,17 @@ async function sb(method, path, body, extraPrefer) {
 
 const fmtD = d => d ? (d.toString().split("T")[0]) : null;
 const daysSince = (dateStr, today) => dateStr ? Math.floor((today - new Date(dateStr + "T00:00:00Z").getTime()) / DAY) : null;
+
+// Carga los umbrales editables (settings key=config) y sobrescribe los valores por defecto.
+async function applyConfig() {
+  try {
+    const r = await sb("GET", "settings?key=eq.config&select=value");
+    const cfg = (r && r[0] && r[0].value) || {};
+    if (cfg.active_days != null)         ACTIVE_DAYS = cfg.active_days;
+    if (cfg.floor_inactive != null)      FLOOR_INACTIVE = STORE_FALLBACK_INACTIVE = cfg.floor_inactive;
+    if (cfg.vet_inactive_months != null) VET_INACTIVE = Math.round(cfg.vet_inactive_months * 30.42);
+  } catch (e) { /* valores por defecto */ }
+}
 
 // Intervalo de compra en tienda: colapsa compras de la misma semana en un solo evento
 // (tickets del mismo viaje / devoluciones) y devuelve la mediana de huecos + nº de eventos.
@@ -96,6 +107,7 @@ function computeStatus({ anyLast, vetLast, shopLast, interval, events, hasSales 
 exports.handler = async () => {
   const today = Date.now();
   try {
+    await applyConfig();
     const socioRows = await sb("GET", "clients?select=id,wk_client_id&wk_client_id=not.is.null");
     const socios = (socioRows || []).filter(c => c.wk_client_id);
 

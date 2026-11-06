@@ -7,7 +7,7 @@
 
 const SUPABASE_URL = process.env.SUPABASE_URL;
 const SUPABASE_KEY = process.env.SUPABASE_SERVICE_KEY || process.env.SUPABASE_KEY;
-const WINDOW_DAYS  = 14;   // ventana de atribución compra-tras-aviso
+let WINDOW_DAYS    = 14;   // ventana de atribución compra-tras-aviso (editable: settings config.window_days)
 const LOOKBACK_DAYS = 60;  // no reconciliar avisos más viejos que esto
 
 async function sb(method, path, body) {
@@ -29,6 +29,7 @@ function addDays(dateStr, days) {
 exports.handler = async () => {
   const cors = { "Access-Control-Allow-Origin": "*", "Content-Type": "application/json" };
   try {
+    try { const cr = await sb("GET", "settings?key=eq.config&select=value"); const cfg = (cr && cr[0] && cr[0].value) || {}; if (cfg.window_days != null) WINDOW_DAYS = cfg.window_days; } catch (e) {}
     const today = new Date().toISOString().slice(0, 10);
     const sinceIso = addDays(today, -LOOKBACK_DAYS);
 

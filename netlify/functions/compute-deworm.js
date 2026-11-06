@@ -19,7 +19,13 @@ async function sb(method, path, body) {
 
 // Antelación: avisamos LEAD_DAYS antes de que se agote la protección, para que no
 // haya hueco sin desparasitar (el socio compra antes de quedarse descubierto).
-const LEAD_DAYS = 7;
+// Editable desde el CRM (settings key=config → lead_days); 7 por defecto.
+let LEAD_DAYS = 7;
+
+async function loadConfig() {
+  try { const r = await sb("GET", "settings?key=eq.config&select=value"); return (r && r[0] && r[0].value) || {}; }
+  catch (e) { return {}; }
+}
 
 function addDays(dateStr, days) {
   const d = new Date(dateStr + "T00:00:00Z");
@@ -32,6 +38,8 @@ exports.handler = async (event) => {
   let detail = false;
   try { detail = !!JSON.parse((event && event.body) || "{}").detail; } catch(e) {}
   try {
+    const cfg = await loadConfig();
+    if (cfg.lead_days != null) LEAD_DAYS = cfg.lead_days;
     const today = new Date().toISOString().slice(0, 10);
 
     // 1) Socios (para nombre/teléfono del aviso y para limitar a socios actuales)

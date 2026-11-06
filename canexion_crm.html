@@ -768,6 +768,18 @@ input:checked+.togslider:before{transform:translateX(16px);}
   <div id="sb" class="screen">
     <div class="ben-wrap">
 
+      <!-- Parámetros del piloto -->
+      <div class="ben-section">
+        <div class="ben-sh">
+          <div>
+            <div class="ben-st">Parámetros del piloto</div>
+            <div class="ben-ss">Umbrales que usan los avisos y los cálculos. Afectan al CRM y a los procesos diarios (se aplican en la siguiente ejecución).</div>
+          </div>
+        </div>
+        <div id="config-fields"><div class="loading-state"><div class="spinner"></div></div></div>
+        <button class="subbtn" id="sbtn-config" onclick="saveConfig()" style="margin-top:6px;">Guardar parámetros</button>
+      </div>
+
       <!-- Beneficios de bienvenida -->
       <div class="ben-section">
         <div class="ben-sh">
@@ -1245,7 +1257,7 @@ let dewormAlertsMap  = {}; // wk_client_id → alert
 let wkStatsMap       = {}; // wk_client_id → wk_client_stats row
 let msgLogByClient   = {}; // clients.id → [{aviso_type, result, created_at}] (últimos ~45 días)
 let lastFeedItems    = []; // último render del feed (para acciones por índice, p.ej. push)
-const MONTHLY_CAP    = 2;  // máx. mensajes/mes por socio (avisos + campañas + invitaciones)
+let MONTHLY_CAP      = 2;  // máx. mensajes/mes por socio (editable en Parámetros → settings)
 
 // Plantillas de mensajes de "Hoy". Editables desde el CRM (tabla templates); si no hay
 // override, se usan estos textos por defecto. Variables: {nombre} {producto} {mascota}
@@ -1253,6 +1265,7 @@ const MONTHLY_CAP    = 2;  // máx. mensajes/mes por socio (avisos + campañas +
 let templatesMap = {}; // type → { es: texto, eu: texto }
 let feedPhases   = {}; // type → bool (aviso activo en "Hoy"); ausente = activo
 function phaseEnabled(type) { return feedPhases[type] !== false; }
+let configMap    = {}; // parámetros editables (settings key=config)
 const DEFAULT_TEMPLATES = {
   deworm: {
     es: "¡Hola {nombre}! 💊 Han pasado los 2 meses y medio desde que compraste {producto}. ¿Habéis podido hacer la desparasitación? Si necesitáis más producto, podéis pasaros por la clínica 🐾",
@@ -1559,6 +1572,8 @@ async function loadAll() {
     templatesMap = {};
     (tpl || []).forEach(t => { (templatesMap[t.type] ||= {})[t.language] = t.text; });
     feedPhases = (((stg || []).find(s => s.key === "feed_phases") || {}).value) || {};
+    configMap  = (((stg || []).find(s => s.key === "config") || {}).value) || {};
+    if (configMap.monthly_cap != null) MONTHLY_CAP = configMap.monthly_cap;
     // Deworm y Wakyma stats deben estar listos antes de mapClient
     dewormAlertsMap = {};
     (dad  || []).forEach(a => { dewormAlertsMap[String(a.wk_client_id)] = a; });
@@ -1573,6 +1588,7 @@ async function loadAll() {
     renderCampaigns();
     renderBenefitTemplates();
     renderDiscoveryCoupons();
+    renderConfig();
     updateFeedBadge();
     document.getElementById("mc").textContent = clients.length + " miembro" + (clients.length !== 1 ? "s" : "");
     checkExpiringCoupons();
@@ -4144,6 +4160,46 @@ async function savePhases() {
     showToast("Avisos actualizados ✓");
   } catch(e) { showToast("Error al guardar", true); }
   finally { if (btn) { btn.disabled = false; btn.textContent = "Guardar"; } }
+}
+
+// ── PARÁMETROS EDITABLES (settings key=config) ───────────
+const CONFIG_DEFS = [
+  { key: "lead_days",           label: "Antelación desparasitación (días)",     def: 7,   hint: "Avisa este nº de días antes de que se agote la protección." },
+  { key: "monthly_cap",         label: "Tope de mensajes/mes por socio",        def: 2,   hint: "Máx. WhatsApp al mes (avisos + campañas + invitaciones)." },
+  { key: "active_days",         label: "Días para seguir 'activo'",             def: 90,  hint: "Compra o visita en los últimos X días = activo." },
+  { key: "floor_inactive",      label: "Días sin actividad para 'inactivo'",    def: 180, hint: "Nunca se marca inactivo antes de X días sin nada." },
+  { key: "vet_inactive_months", label: "Meses sin visita al vet para 'inactivo'", def: 15, hint: "Cliente de clínica sin visita en X meses." },
+  { key: "window_days",         label: "Ventana de compra tras aviso (días)",   def: 14,  hint: "Para medir 'compra a 14 días' y recuperados." }
+];
+
+function renderConfig() {
+  const el = document.getElementById("config-fields");
+  if (!el) return;
+  el.innerHTML = CONFIG_DEFS.map(d => `
+    <div class="fg">
+      <label class="fl">${d.label}</label>
+      <input class="fi" id="cfg-${d.key}" type="number" min="1" value="${configMap[d.key] != null ? configMap[d.key] : d.def}"/>
+      <div style="font-size:11px;color:var(--tm);margin-top:3px;">${d.hint}</div>
+    </div>`).join("");
+}
+
+async function saveConfig() {
+  const btn = document.getElementById("sbtn-config");
+  if (btn) { btn.disabled = true; btn.textContent = "Guardando..."; }
+  try {
+    const val = {};
+    for (const d of CONFIG_DEFS) {
+      const n = parseInt((document.getElementById(`cfg-${d.key}`) || {}).value, 10);
+      val[d.key] = (isNaN(n) || n < 1) ? d.def : n;
+    }
+    await sb("POST", "settings", { filter: "on_conflict=key", prefer: "resolution=merge-duplicates,return=minimal", body: { key: "config", value: val, updated_at: new Date().toISOString() } });
+    configMap = val;
+    MONTHLY_CAP = val.monthly_cap;
+    renderConfig();
+    if (document.getElementById("sy").classList.contains("active")) renderFeed();
+    showToast("Parámetros guardados ✓ (los cálculos diarios lo aplican en su próxima ejecución)");
+  } catch(e) { showToast("Error al guardar", true); }
+  finally { if (btn) { btn.disabled = false; btn.textContent = "Guardar parámetros"; } }
 }
 
 function sendDewormWA() {
